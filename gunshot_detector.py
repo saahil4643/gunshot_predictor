@@ -13,10 +13,10 @@ import shutil
 # CONFIG
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "model", "final_gunshot_model.h5")
-SAMPLE_RATE = 22050
+SAMPLE_RATE = 44100
 DURATION = 3
 SAMPLES_PER_TRACK = SAMPLE_RATE * DURATION
-THRESHOLD = 0.4
+THRESHOLD = 0.28
 
 
 def _resolve_ffmpeg_path():
@@ -63,9 +63,11 @@ def convert_to_wav(input_file):
 
     command = [
         ffmpeg_path,
+        "-hide_banner",
+        "-loglevel", "error",
         "-i", input_file,
         "-ac", "1",
-        "-ar", "22050",
+        "-ar", str(SAMPLE_RATE),
         "-y",
         output_file
     ]
@@ -78,7 +80,9 @@ def convert_to_wav(input_file):
         ) from exc
     except subprocess.CalledProcessError as exc:
         stderr_text = exc.stderr.decode(errors="ignore").strip()
-        raise RuntimeError(f"ffmpeg conversion failed: {stderr_text}") from exc
+        stderr_lines = [line.strip() for line in stderr_text.splitlines() if line.strip()]
+        short_error = stderr_lines[-1] if stderr_lines else "unsupported or invalid audio format"
+        raise RuntimeError(f"ffmpeg conversion failed: {short_error}") from exc
 
     return output_file
 
@@ -123,24 +127,31 @@ def detect_gunshot(file_path):
 
         results = []
         gunshot_detected = False
+        max_score = 0.0
 
         for i, chunk in enumerate(chunks):
             processed = preprocess_chunk(chunk)
             prediction = model.predict(processed, verbose=0)[0][0]
+            score = float(prediction)
 
-            is_gunshot = bool(prediction > THRESHOLD)
+            is_gunshot = bool(score > THRESHOLD)
 
             results.append({
                 "chunk": int(i + 1),
-                "score": float(prediction),
+                "score": score,
                 "gunshot": is_gunshot
             })
+
+            if score > max_score:
+                max_score = score
 
             if is_gunshot:
                 gunshot_detected = True
 
         return {
             "gunshot_detected": bool(gunshot_detected),
+            "threshold": float(THRESHOLD),
+            "max_score": float(max_score),
             "chunks": results
         }
     finally:
