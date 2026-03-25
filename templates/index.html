@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gunshot Detection</title>
+</head>
+<body>
+
+<h2>🔫 Gunshot Detection</h2>
+
+<input type="file" id="audioFile">
+<button onclick="upload()">Detect</button>
+
+<pre id="result"></pre>
+
+<script>
+async function upload() {
+    const fileInput = document.getElementById("audioFile");
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert("Select a file first");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const response = await fetch("/predict", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        document.getElementById("result").innerText =
+            JSON.stringify(data, null, 2);
+
+    } catch (err) {
+        document.getElementById("result").innerText =
+            "Error: " + err;
+    }
+}
+</script>
+
+</body>
+</html>
