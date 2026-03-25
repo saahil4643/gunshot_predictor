@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from gunshot_detector import detect_gunshot
 import os
 import uuid
+import traceback
 
 app = Flask(__name__, template_folder="templates")
 
@@ -22,13 +23,23 @@ def predict():
 
     file = request.files["file"]
 
-    temp_file = f"upload_{uuid.uuid4()}"
+    original_name = file.filename or ""
+    _, ext = os.path.splitext(original_name)
+    temp_file = f"upload_{uuid.uuid4()}{ext}"
     file.save(temp_file)
 
     try:
         result = detect_gunshot(temp_file)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "error": str(e),
+            "type": e.__class__.__name__,
+            "debug": {
+                "cwd": os.getcwd(),
+                "uploaded_file": temp_file,
+                "traceback": traceback.format_exc()
+            }
+        }), 500
     finally:
         if os.path.exists(temp_file):
             os.remove(temp_file)

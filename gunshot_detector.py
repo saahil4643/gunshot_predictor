@@ -8,13 +8,40 @@ import tensorflow as tf
 import subprocess
 import os
 import uuid
+import shutil
 
 # CONFIG
-MODEL_PATH = "model/final_gunshot_model.h5"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "model", "final_gunshot_model.h5")
 SAMPLE_RATE = 22050
 DURATION = 3
 SAMPLES_PER_TRACK = SAMPLE_RATE * DURATION
 THRESHOLD = 0.4
+
+
+def _resolve_ffmpeg_path():
+    env_path = os.environ.get("FFMPEG_PATH")
+    if env_path and os.path.isfile(env_path):
+        return env_path
+
+    path_cmd = shutil.which("ffmpeg")
+    if path_cmd:
+        return path_cmd
+
+    # Common Windows winget location fallback.
+    local_app_data = os.environ.get("LOCALAPPDATA", "")
+    winget_candidate = os.path.join(
+        local_app_data,
+        "Microsoft",
+        "WinGet",
+        "Packages",
+    )
+    if os.path.isdir(winget_candidate):
+        for root, _, files in os.walk(winget_candidate):
+            if "ffmpeg.exe" in files:
+                return os.path.join(root, "ffmpeg.exe")
+
+    return None
 
 # LOAD MODEL
 model = tf.keras.models.load_model(MODEL_PATH)
@@ -22,10 +49,20 @@ print("✅ Model Loaded")
 
 # CONVERT AUDIO → WAV (COLAB MATCH)
 def convert_to_wav(input_file):
+    if not os.path.exists(input_file):
+        raise RuntimeError(f"Input audio file not found: {input_file}")
+
+    ffmpeg_path = _resolve_ffmpeg_path()
+    if not ffmpeg_path:
+        raise RuntimeError(
+            "ffmpeg executable not found. Install ffmpeg and add it to PATH, "
+            "or set FFMPEG_PATH to ffmpeg.exe."
+        )
+
     output_file = f"temp_{uuid.uuid4()}.wav"
 
     command = [
-        "ffmpeg",
+        ffmpeg_path,
         "-i", input_file,
         "-ac", "1",
         "-ar", "22050",
@@ -33,7 +70,16 @@ def convert_to_wav(input_file):
         output_file
     ]
 
-    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"ffmpeg launch failed (WinError 2). Resolved path: {ffmpeg_path}"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        stderr_text = exc.stderr.decode(errors="ignore").strip()
+        raise RuntimeError(f"ffmpeg conversion failed: {stderr_text}") from exc
+
     return output_file
 
 # SPLIT AUDIO
@@ -71,32 +117,32 @@ def preprocess_chunk(audio_chunk):
 # MAIN FUNCTION
 def detect_gunshot(file_path):
     wav_file = convert_to_wav(file_path)
+    try:
+        audio, _ = librosa.load(wav_file, sr=SAMPLE_RATE)
+        chunks = split_audio(audio)
 
-    audio, _ = librosa.load(wav_file, sr=SAMPLE_RATE)
-    chunks = split_audio(audio)
+        results = []
+        gunshot_detected = False
 
-    results = []
-    gunshot_detected = False
+        for i, chunk in enumerate(chunks):
+            processed = preprocess_chunk(chunk)
+            prediction = model.predict(processed, verbose=0)[0][0]
 
-    for i, chunk in enumerate(chunks):
-        processed = preprocess_chunk(chunk)
-        prediction = model.predict(processed, verbose=0)[0][0]
+            is_gunshot = bool(prediction > THRESHOLD)
 
-        is_gunshot = bool(prediction > THRESHOLD)
+            results.append({
+                "chunk": int(i + 1),
+                "score": float(prediction),
+                "gunshot": is_gunshot
+            })
 
-        results.append({
-            "chunk": int(i + 1),
-            "score": float(prediction),
-            "gunshot": is_gunshot
-        })
+            if is_gunshot:
+                gunshot_detected = True
 
-        if is_gunshot:
-            gunshot_detected = True
-
-    if os.path.exists(wav_file):
-        os.remove(wav_file)
-
-    return {
-        "gunshot_detected": bool(gunshot_detected),
-        "chunks": results
-    }
+        return {
+            "gunshot_detected": bool(gunshot_detected),
+            "chunks": results
+        }
+    finally:
+        if os.path.exists(wav_file):
+            os.remove(wav_file)
