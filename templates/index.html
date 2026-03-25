@@ -3,53 +3,283 @@
 <head>
     <title>Gunshot Detection</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #f4f8f2;
+            --bg-accent: #d8e8cf;
+            --panel: rgba(255, 255, 255, 0.78);
+            --panel-border: rgba(47, 67, 54, 0.15);
+            --text: #1f2a24;
+            --muted: #5a6a61;
+            --primary: #0f766e;
+            --primary-strong: #115e59;
+            --danger: #b42318;
+            --ok: #027a48;
+            --shadow: 0 12px 30px rgba(31, 42, 36, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            line-height: 1.4;
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            margin: 0;
+            color: var(--text);
+            line-height: 1.5;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 15% 20%, rgba(15, 118, 110, 0.18), transparent 36%),
+                radial-gradient(circle at 80% 10%, rgba(95, 163, 107, 0.2), transparent 32%),
+                linear-gradient(140deg, var(--bg) 0%, #e8f3e2 55%, var(--bg-accent) 100%);
+            padding: 20px;
+        }
+
+        .page {
+            max-width: 980px;
+            margin: 0 auto;
+            display: grid;
+            gap: 18px;
+            animation: fade-in 0.5s ease-out;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 18px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(6px);
+            padding: 20px;
+        }
+
+        .hero h1 {
+            font-size: clamp(1.7rem, 4vw, 2.5rem);
+            margin: 0;
+            letter-spacing: -0.03em;
+        }
+
+        .hero p {
+            margin: 10px 0 0;
+            color: var(--muted);
+            max-width: 56ch;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
         }
 
         .row {
-            margin-bottom: 16px;
+            margin-top: 14px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 8px;
+            background: #fff;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .loading-wrap {
+            margin-top: 12px;
+            display: none;
+        }
+
+        .loading-wrap.active {
+            display: block;
+        }
+
+        .loading-label {
+            font-size: 0.88rem;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: #deebe0;
+            overflow: hidden;
+            border: 1px solid #c7dbc9;
+        }
+
+        .progress-bar {
+            width: 35%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #0f766e, #34d399);
+            animation: indeterminate 1.1s ease-in-out infinite;
         }
 
         button {
-            margin-right: 8px;
-            padding: 8px 12px;
+            border: 0;
+            border-radius: 12px;
+            padding: 10px 14px;
             cursor: pointer;
+            color: #fff;
+            font-family: inherit;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--primary), #0ea5a4);
+            transition: transform 0.12s ease, filter 0.2s ease;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            filter: brightness(1.05);
+        }
+
+        button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .danger {
+            background: linear-gradient(135deg, #dc2626, var(--danger));
         }
 
         #status {
             font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary-strong);
+        }
+
+        #status::before {
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 0 4px rgba(17, 94, 89, 0.14);
+        }
+
+        #status.status-alert {
+            color: var(--danger);
+        }
+
+        #status.status-ok {
+            color: var(--ok);
         }
 
         pre {
-            background: #f5f5f5;
-            border: 1px solid #ddd;
+            font-family: "IBM Plex Mono", "Consolas", monospace;
+            background: #f8fbf7;
+            border: 1px solid #d8e4d4;
             padding: 12px;
             border-radius: 8px;
             white-space: pre-wrap;
             word-break: break-word;
+            min-height: 180px;
+            margin: 0;
+        }
+
+        .hint {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes indeterminate {
+            0% {
+                transform: translateX(-130%);
+            }
+            100% {
+                transform: translateX(360%);
+            }
+        }
+
+        @media (max-width: 860px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            body {
+                padding: 14px;
+            }
+
+            .card {
+                padding: 16px;
+            }
         }
     </style>
 </head>
 <body>
 
-<h2>🔫 Gunshot Detection</h2>
+<main class="page">
+    <section class="card hero">
+        <h1>Gunshot Audio Detection</h1>
+        <p>Upload an audio file or analyze short microphone clips in near real time. The detector returns a prediction payload for each processed sample.</p>
+    </section>
 
-<div class="row">
-    <input type="file" id="audioFile" accept="audio/*">
-    <button onclick="upload()">Detect File</button>
-</div>
+    <section class="grid">
+        <article class="card">
+            <h2>File Analysis</h2>
+            <div class="row">
+                <label for="audioFile">Audio input</label>
+                <input type="file" id="audioFile" accept="audio/*">
+            </div>
+            <div class="row actions">
+                <button id="detectBtn" onclick="upload()">Detect File</button>
+            </div>
+            <div id="detectLoading" class="loading-wrap" aria-live="polite">
+                <div id="detectLoadingText" class="loading-label">Detecting audio...</div>
+                <div class="progress-track" role="progressbar" aria-valuetext="Detection in progress">
+                    <div class="progress-bar"></div>
+                </div>
+            </div>
+            <p class="hint">Accepted by browser picker: any audio format. Server-side conversion/validation may still apply.</p>
+        </article>
 
-<div class="row">
-    <button id="startLiveBtn" onclick="startLive()">Start Live</button>
-    <button id="stopLiveBtn" onclick="stopLive()" disabled>Stop Live</button>
-    <span id="status">Live status: Idle</span>
-</div>
+        <article class="card">
+            <h2>Live Monitoring</h2>
+            <div class="row actions">
+                <button id="startLiveBtn" onclick="startLive()">Start Live</button>
+                <button id="stopLiveBtn" class="danger" onclick="stopLive()" disabled>Stop Live</button>
+            </div>
+            <div class="row">
+                <span id="status">Live status: Idle</span>
+            </div>
+            <p class="hint">Captures 3 second clips continuously and sends them to the prediction API.</p>
+        </article>
+    </section>
 
-<pre id="result"></pre>
+    <section class="card">
+        <h2>Detection Output</h2>
+        <pre id="result">No results yet.</pre>
+    </section>
+</main>
 
 <script>
 const LIVE_CLIP_MS = 3000;
@@ -58,8 +288,28 @@ let liveStream = null;
 let liveChunks = 0;
 let liveRunning = false;
 
+function setDetectLoading(isLoading, label = "Detecting audio...") {
+    const loadingEl = document.getElementById("detectLoading");
+    const loadingTextEl = document.getElementById("detectLoadingText");
+    const detectBtn = document.getElementById("detectBtn");
+
+    loadingTextEl.innerText = label;
+    loadingEl.classList.toggle("active", isLoading);
+    detectBtn.disabled = isLoading;
+    detectBtn.innerText = isLoading ? "Detecting..." : "Detect File";
+}
+
 function setStatus(text) {
-    document.getElementById("status").innerText = `Live status: ${text}`;
+    const statusEl = document.getElementById("status");
+    statusEl.innerText = `Live status: ${text}`;
+    statusEl.classList.remove("status-alert", "status-ok");
+
+    const lower = String(text).toLowerCase();
+    if (lower.includes("detected") || lower.includes("error") || lower.includes("denied")) {
+        statusEl.classList.add("status-alert");
+    } else if (lower.includes("listening") || lower.includes("stopped") || lower.includes("idle")) {
+        statusEl.classList.add("status-ok");
+    }
 }
 
 async function sendAudioBlob(blob, fileName = "audio.webm") {
@@ -91,14 +341,19 @@ async function upload() {
     }
 
     try {
+        setDetectLoading(true, "Uploading and analyzing audio...");
         const data = await sendAudioBlob(file, file.name || "upload.wav");
 
         document.getElementById("result").innerText =
             JSON.stringify(data, null, 2);
+        setStatus("File analysis completed");
 
     } catch (err) {
         document.getElementById("result").innerText =
             "Error: " + err;
+        setStatus("File analysis error");
+    } finally {
+        setDetectLoading(false);
     }
 }
 
@@ -133,7 +388,8 @@ async function startLive() {
             try {
                 setStatus(`Processing chunk ${liveChunks}`);
                 const data = await sendAudioBlob(clipBlob, `live_${Date.now()}.webm`);
-                const text = [`[Chunk ${liveChunks}]`, JSON.stringify(data, null, 2), ""].join("\n");
+                const timestamp = new Date().toLocaleTimeString();
+                const text = [`[${timestamp}] Chunk ${liveChunks}`, JSON.stringify(data, null, 2), ""].join("\n");
 
                 const resultElement = document.getElementById("result");
                 resultElement.innerText = text + resultElement.innerText;
