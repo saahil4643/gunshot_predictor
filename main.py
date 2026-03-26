@@ -113,7 +113,7 @@ def send_alert_email(label, detection_type="upload", score=None, probabilities=N
     Send an email alert when gunshot or scream is detected.
     
     Args:
-        label: Detection label (e.g., "Gunshot 🔫", "Scream 😱")
+        label: Detection label (e.g., "Gunshot ", "Scream ")
         detection_type: Either "upload" or "live"
         score: Confidence score
         probabilities: Dict with gunshot, scream, background probabilities
@@ -174,17 +174,17 @@ def _prediction_from_probs(gun, scream, bg, mode="upload"):
 
     if mode == "live":
         if gun >= LIVE_GUNSHOT_CONFIRM_THRESHOLD:
-            return "Gunshot 🔫", True
+            return "Gunshot ", True
         if gun >= LIVE_GUNSHOT_PROBABLE_THRESHOLD:
-            return "Possible Gunshot ⚠️", False
+            return "Possible Gunshot ", False
         if scream >= LIVE_SCREAM_THRESHOLD:
-            return "Scream 😱", False
+            return "Scream ", False
         return "Background", False
 
     if gun > UPLOAD_GUNSHOT_THRESHOLD:
-        return "Gunshot 🔫", True
+        return "Gunshot ", True
     if scream > UPLOAD_SCREAM_THRESHOLD:
-        return "Scream 😱", False
+        return "Scream ", False
     return "Background", False
 
 
@@ -298,7 +298,7 @@ def predict_audio(path):
             best_label = label
 
     # Send email alert if gunshot or scream detected
-    if best_label in ["Gunshot 🔫", "Scream 😱"] and results:
+    if best_label in ["Gunshot ", "Scream "] and results:
         best_chunk = max(results, key=lambda x: max(x['gunshot'], x['scream']))
         send_alert_email(
             best_label,
@@ -368,7 +368,7 @@ def predict_single_live_chunk(path, debug_wav_path=None):
         }
 
     # Send email alert if gunshot or scream with high confidence detected
-    if best["alert"] or best["label"] in ["Gunshot 🔫", "Scream 😱"]:
+    if best["alert"] or best["label"] in ["Gunshot ", "Scream "]:
         send_alert_email(
             best["label"],
             detection_type="live",
@@ -386,8 +386,8 @@ def predict_single_live_chunk(path, debug_wav_path=None):
         "background": best["background"],
         "label": best["label"],
         "alert": best["alert"],
-        "gunshot_alert": best["label"] == "Gunshot 🔫",
-        "scream_alert": best["label"] == "Scream 😱",
+        "gunshot_alert": best["label"] == "Gunshot ",
+        "scream_alert": best["label"] == "Scream ",
         "live_thresholds": {
             "gunshot_confirm": LIVE_GUNSHOT_CONFIRM_THRESHOLD,
             "gunshot_probable": LIVE_GUNSHOT_PROBABLE_THRESHOLD,
@@ -458,8 +458,8 @@ async def predict(request: Request, file: UploadFile = File(...)):
         confidence = max(best_chunk['gunshot'], best_chunk['scream'])
     
     # Determine alert statuses
-    gunshot_alert = "Gunshot 🔫" in final
-    scream_alert = "Scream 😱" in final
+    gunshot_alert = "Gunshot " in final
+    scream_alert = "Scream " in final
 
     return JSONResponse({
         "label": final,
