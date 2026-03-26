@@ -1,24 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Gunshot Detection</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <title>Audio Detection</title>
     <style>
         :root {
-            --bg: #f4f8f2;
-            --bg-accent: #d8e8cf;
-            --panel: rgba(255, 255, 255, 0.78);
-            --panel-border: rgba(47, 67, 54, 0.15);
-            --text: #1f2a24;
-            --muted: #5a6a61;
-            --primary: #0f766e;
-            --primary-strong: #115e59;
-            --danger: #b42318;
-            --ok: #027a48;
-            --shadow: 0 12px 30px rgba(31, 42, 36, 0.12);
+            --bg-start: #f7f2e8;
+            --bg-end: #e6efe9;
+            --card: #fffdf8;
+            --text: #1f2a2e;
+            --muted: #58656c;
+            --primary: #0f7b6c;
+            --primary-hover: #0c6559;
+            --danger: #b6413c;
+            --danger-hover: #973733;
+            --border: #d8e0db;
         }
 
         * {
@@ -26,437 +21,343 @@
         }
 
         body {
-            font-family: "Space Grotesk", "Segoe UI", sans-serif;
             margin: 0;
-            color: var(--text);
-            line-height: 1.5;
             min-height: 100vh;
-            background:
-                radial-gradient(circle at 15% 20%, rgba(15, 118, 110, 0.18), transparent 36%),
-                radial-gradient(circle at 80% 10%, rgba(95, 163, 107, 0.2), transparent 32%),
-                linear-gradient(140deg, var(--bg) 0%, #e8f3e2 55%, var(--bg-accent) 100%);
-            padding: 20px;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            background: linear-gradient(145deg, var(--bg-start), var(--bg-end));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
         }
 
-        .page {
-            max-width: 980px;
-            margin: 0 auto;
-            display: grid;
-            gap: 18px;
-            animation: fade-in 0.5s ease-out;
-        }
-
-        .card {
-            background: var(--panel);
-            border: 1px solid var(--panel-border);
+        .panel {
+            width: 100%;
+            max-width: 560px;
+            background: var(--card);
+            border: 1px solid var(--border);
             border-radius: 18px;
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(6px);
-            padding: 20px;
+            padding: 28px;
+            box-shadow: 0 18px 40px rgba(23, 36, 34, 0.12);
         }
 
-        .hero h1 {
-            font-size: clamp(1.7rem, 4vw, 2.5rem);
-            margin: 0;
-            letter-spacing: -0.03em;
-        }
-
-        .hero p {
-            margin: 10px 0 0;
-            color: var(--muted);
-            max-width: 56ch;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 18px;
-        }
-
-        .row {
-            margin-top: 14px;
-        }
-
-        label {
-            display: block;
+        h1 {
+            margin-top: 0;
             margin-bottom: 8px;
+            font-size: 1.9rem;
+        }
+
+        p {
+            margin: 0 0 22px;
             color: var(--muted);
-            font-size: 0.92rem;
+        }
+
+        .section {
+            text-align: left;
+            margin-bottom: 22px;
+        }
+
+        .section h3 {
+            margin: 0 0 10px;
+            font-size: 1.05rem;
         }
 
         input[type="file"] {
             width: 100%;
-            border: 1px solid var(--panel-border);
-            border-radius: 12px;
-            padding: 8px;
-            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            background: #ffffff;
         }
 
-        .actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .loading-wrap {
-            margin-top: 12px;
-            display: none;
-        }
-
-        .loading-wrap.active {
-            display: block;
-        }
-
-        .loading-label {
-            font-size: 0.88rem;
-            color: var(--muted);
-            margin-bottom: 6px;
-        }
-
-        .progress-track {
-            width: 100%;
-            height: 8px;
-            border-radius: 999px;
-            background: #deebe0;
-            overflow: hidden;
-            border: 1px solid #c7dbc9;
-        }
-
-        .progress-bar {
-            width: 35%;
-            height: 100%;
-            border-radius: inherit;
-            background: linear-gradient(90deg, #0f766e, #34d399);
-            animation: indeterminate 1.1s ease-in-out infinite;
-        }
-
-        button {
-            border: 0;
-            border-radius: 12px;
-            padding: 10px 14px;
-            cursor: pointer;
-            color: #fff;
-            font-family: inherit;
+        .btn {
+            border: none;
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 0.95rem;
             font-weight: 600;
-            background: linear-gradient(135deg, var(--primary), #0ea5a4);
-            transition: transform 0.12s ease, filter 0.2s ease;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.2s ease;
         }
 
-        button:hover:not(:disabled) {
+        .btn:hover {
             transform: translateY(-1px);
-            filter: brightness(1.05);
         }
 
-        button:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
+        .btn-primary {
+            background: var(--primary);
         }
 
-        .danger {
-            background: linear-gradient(135deg, #dc2626, var(--danger));
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-hover);
+        }
+
+        .live-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         #status {
-            font-weight: bold;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--primary-strong);
+            margin-top: 12px;
+            margin-bottom: 0;
+            font-weight: 600;
+            color: #2e3f45;
         }
 
-        #status::before {
-            content: "";
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: currentColor;
-            box-shadow: 0 0 0 4px rgba(17, 94, 89, 0.14);
-        }
-
-        #status.status-alert {
-            color: var(--danger);
-        }
-
-        #status.status-ok {
-            color: var(--ok);
-        }
-
-        pre {
-            font-family: "IBM Plex Mono", "Consolas", monospace;
-            background: #f8fbf7;
-            border: 1px solid #d8e4d4;
+        .result {
+            margin-top: 18px;
             padding: 12px;
-            border-radius: 8px;
-            white-space: pre-wrap;
-            word-break: break-word;
-            min-height: 180px;
-            margin: 0;
-        }
-
-        .hint {
-            color: var(--muted);
-            font-size: 0.9rem;
-            margin-top: 10px;
-        }
-
-        @keyframes fade-in {
-            from {
-                opacity: 0;
-                transform: translateY(6px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes indeterminate {
-            0% {
-                transform: translateX(-130%);
-            }
-            100% {
-                transform: translateX(360%);
-            }
-        }
-
-        @media (max-width: 860px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-
-            body {
-                padding: 14px;
-            }
-
-            .card {
-                padding: 16px;
-            }
+            border-radius: 10px;
+            background: #eef7f4;
+            border: 1px solid #d2e6df;
+            font-weight: 600;
+            text-align: left;
         }
     </style>
 </head>
+
 <body>
+<main class="panel">
+    <h1>Audio Detection System</h1>
+    <p>Upload a file or run live microphone detection.</p>
 
-<main class="page">
-    <section class="card hero">
-        <h1>Gunshot Audio Detection</h1>
-        <p>Upload an audio file or analyze short microphone clips in near real time. The detector returns a prediction payload for each processed sample.</p>
+    <section class="section">
+        <h3>Upload Audio</h3>
+        <form action="/predict" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" required>
+            <br><br>
+            <button class="btn btn-primary" type="submit">Upload & Predict</button>
+        </form>
     </section>
 
-    <section class="grid">
-        <article class="card">
-            <h2>File Analysis</h2>
-            <div class="row">
-                <label for="audioFile">Audio input</label>
-                <input type="file" id="audioFile" accept="audio/*">
-            </div>
-            <div class="row actions">
-                <button id="detectBtn" onclick="upload()">Detect File</button>
-            </div>
-            <div id="detectLoading" class="loading-wrap" aria-live="polite">
-                <div id="detectLoadingText" class="loading-label">Detecting audio...</div>
-                <div class="progress-track" role="progressbar" aria-valuetext="Detection in progress">
-                    <div class="progress-bar"></div>
-                </div>
-            </div>
-            <p class="hint">Accepted by browser picker: any audio format. Server-side conversion/validation may still apply.</p>
-        </article>
-
-        <article class="card">
-            <h2>Live Monitoring</h2>
-            <div class="row actions">
-                <button id="startLiveBtn" onclick="startLive()">Start Live</button>
-                <button id="stopLiveBtn" class="danger" onclick="stopLive()" disabled>Stop Live</button>
-            </div>
-            <div class="row">
-                <span id="status">Live status: Idle</span>
-            </div>
-            <p class="hint">Captures 3 second clips continuously and sends them to the prediction API.</p>
-        </article>
+    <section class="section">
+        <h3>Live Detection</h3>
+        <div class="live-actions">
+            <button class="btn btn-primary" onclick="startRec()">Start Live Detection</button>
+            <button class="btn btn-danger" onclick="stopRec()">Stop Live Detection</button>
+        </div>
+        <p id="status"></p>
     </section>
 
-    <section class="card">
-        <h2>Detection Output</h2>
-        <pre id="result">No results yet.</pre>
-    </section>
+    {% if result %}
+    <div class="result">Final Result: {{ result }}</div>
+    {% endif %}
 </main>
 
 <script>
-const LIVE_CLIP_MS = 3000;
+let recorder;
+let streamRef;
+let liveChunkCount = 0;
+let hasGunshotAlerted = false;
+let hasScreamAlerted = false;
+let isLiveRunning = false;
+let chunkTimer = null;
 
-let liveStream = null;
-let liveChunks = 0;
-let liveRunning = false;
-
-function setDetectLoading(isLoading, label = "Detecting audio...") {
-    const loadingEl = document.getElementById("detectLoading");
-    const loadingTextEl = document.getElementById("detectLoadingText");
-    const detectBtn = document.getElementById("detectBtn");
-
-    loadingTextEl.innerText = label;
-    loadingEl.classList.toggle("active", isLoading);
-    detectBtn.disabled = isLoading;
-    detectBtn.innerText = isLoading ? "Detecting..." : "Detect File";
+function interleaveTo16BitPCM(channelData) {
+    const pcm = new Int16Array(channelData.length);
+    for (let i = 0; i < channelData.length; i += 1) {
+        const s = Math.max(-1, Math.min(1, channelData[i]));
+        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return pcm;
 }
 
-function setStatus(text) {
-    const statusEl = document.getElementById("status");
-    statusEl.innerText = `Live status: ${text}`;
-    statusEl.classList.remove("status-alert", "status-ok");
+function encodeWavFromFloat32(channelData, sampleRate) {
+    const pcm = interleaveTo16BitPCM(channelData);
+    const bytesPerSample = 2;
+    const numChannels = 1;
+    const blockAlign = numChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = pcm.length * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
 
-    const lower = String(text).toLowerCase();
-    if (lower.includes("detected") || lower.includes("error") || lower.includes("denied")) {
-        statusEl.classList.add("status-alert");
-    } else if (lower.includes("listening") || lower.includes("stopped") || lower.includes("idle")) {
-        statusEl.classList.add("status-ok");
-    }
-}
-
-async function sendAudioBlob(blob, fileName = "audio.webm") {
-    const formData = new FormData();
-    formData.append("file", blob, fileName);
-
-    const response = await fetch("/predict", {
-        method: "POST",
-        body: formData
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        const shortError = (data.error || "Request failed").split("\n")[0];
-        throw new Error(shortError);
-    }
-
-    return data;
-}
-
-async function upload() {
-    const fileInput = document.getElementById("audioFile");
-    const file = fileInput.files[0];
-
-    if (!file) {
-        alert("Select a file first");
-        return;
-    }
-
-    try {
-        setDetectLoading(true, "Uploading and analyzing audio...");
-        const data = await sendAudioBlob(file, file.name || "upload.wav");
-
-        document.getElementById("result").innerText =
-            JSON.stringify(data, null, 2);
-        setStatus("File analysis completed");
-
-    } catch (err) {
-        document.getElementById("result").innerText =
-            "Error: " + err;
-        setStatus("File analysis error");
-    } finally {
-        setDetectLoading(false);
-    }
-}
-
-async function startLive() {
-    if (liveRunning) {
-        return;
-    }
-
-    try {
-        liveStream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false,
-                channelCount: 1
-            }
-        });
-        liveRunning = true;
-        liveChunks = 0;
-        document.getElementById("startLiveBtn").disabled = true;
-        document.getElementById("stopLiveBtn").disabled = false;
-        setStatus("Listening");
-
-        while (liveRunning && liveStream) {
-            const clipBlob = await recordClip(liveStream, LIVE_CLIP_MS);
-            if (!clipBlob || clipBlob.size === 0 || !liveRunning) {
-                continue;
-            }
-
-            liveChunks += 1;
-
-            try {
-                setStatus(`Processing chunk ${liveChunks}`);
-                const data = await sendAudioBlob(clipBlob, `live_${Date.now()}.webm`);
-                const timestamp = new Date().toLocaleTimeString();
-                const text = [`[${timestamp}] Chunk ${liveChunks}`, JSON.stringify(data, null, 2), ""].join("\n");
-
-                const resultElement = document.getElementById("result");
-                resultElement.innerText = text + resultElement.innerText;
-
-                if (data.gunshot_detected) {
-                    setStatus("Gunshot detected");
-                } else {
-                    setStatus(`Listening (chunk ${liveChunks})`);
-                }
-            } catch (err) {
-                setStatus("Live error");
-                document.getElementById("result").innerText = "Error: " + err + "\n" + document.getElementById("result").innerText;
-            }
+    let offset = 0;
+    const writeString = (str) => {
+        for (let i = 0; i < str.length; i += 1) {
+            view.setUint8(offset + i, str.charCodeAt(i));
         }
-    } catch (err) {
-        setStatus("Microphone access denied");
-        document.getElementById("result").innerText = "Error: " + err;
-        stopLive();
+        offset += str.length;
+    };
+
+    writeString("RIFF");
+    view.setUint32(offset, 36 + dataSize, true); offset += 4;
+    writeString("WAVE");
+    writeString("fmt ");
+    view.setUint32(offset, 16, true); offset += 4;
+    view.setUint16(offset, 1, true); offset += 2;
+    view.setUint16(offset, numChannels, true); offset += 2;
+    view.setUint32(offset, sampleRate, true); offset += 4;
+    view.setUint32(offset, byteRate, true); offset += 4;
+    view.setUint16(offset, blockAlign, true); offset += 2;
+    view.setUint16(offset, 16, true); offset += 2;
+    writeString("data");
+    view.setUint32(offset, dataSize, true); offset += 4;
+
+    for (let i = 0; i < pcm.length; i += 1) {
+        view.setInt16(offset, pcm[i], true);
+        offset += 2;
+    }
+
+    return new Blob([buffer], { type: "audio/wav" });
+}
+
+async function convertBlobToWav(blob) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioCtx();
+    try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const decoded = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+
+        let mono = decoded.getChannelData(0);
+        if (decoded.numberOfChannels > 1) {
+            const right = decoded.getChannelData(1);
+            const mixed = new Float32Array(decoded.length);
+            for (let i = 0; i < decoded.length; i += 1) {
+                mixed[i] = 0.5 * (mono[i] + right[i]);
+            }
+            mono = mixed;
+        }
+
+        return encodeWavFromFloat32(mono, decoded.sampleRate);
+    } finally {
+        await audioCtx.close();
     }
 }
 
-function recordClip(stream, durationMs) {
-    return new Promise((resolve, reject) => {
-        let recorder;
-        try {
-            recorder = new MediaRecorder(stream);
-        } catch (err) {
-            reject(err);
+function chooseSupportedMimeType() {
+    const candidates = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus"
+    ];
+
+    for (const type of candidates) {
+        if (MediaRecorder.isTypeSupported(type)) {
+            return type;
+        }
+    }
+
+    return "";
+}
+
+function scheduleChunkStop() {
+    if (!isLiveRunning || !recorder || recorder.state !== "recording") {
+        return;
+    }
+
+    chunkTimer = setTimeout(() => {
+        if (isLiveRunning && recorder && recorder.state === "recording") {
+            recorder.stop();
+        }
+    }, 3000);
+}
+
+async function startRec(){
+    if (isLiveRunning) {
+        return;
+    }
+
+    streamRef = await navigator.mediaDevices.getUserMedia({
+        audio: {
+            channelCount: 1,
+            noiseSuppression: false,
+            autoGainControl: false,
+            echoCancellation: false
+        }
+    });
+    const mimeType = chooseSupportedMimeType();
+    recorder = mimeType ? new MediaRecorder(streamRef, { mimeType }) : new MediaRecorder(streamRef);
+
+    isLiveRunning = true;
+    liveChunkCount = 0;
+    hasGunshotAlerted = false;
+    hasScreamAlerted = false;
+    document.getElementById("status").innerText="Live recording started (3s chunks)...";
+
+    recorder.ondataavailable = async (e) => {
+        if (!e.data || e.data.size === 0) {
+            if (isLiveRunning && recorder && recorder.state === "inactive") {
+                recorder.start();
+                scheduleChunkStop();
+            }
             return;
         }
 
-        const parts = [];
+        liveChunkCount += 1;
 
-        recorder.ondataavailable = (event) => {
-            if (event.data && event.data.size > 0) {
-                parts.push(event.data);
+        try {
+            const wavBlob = await convertBlobToWav(e.data);
+            const formData = new FormData();
+            formData.append("file", wavBlob, `live_${liveChunkCount}.wav`);
+
+            const res = await fetch("/predict-live-chunk", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await res.json();
+            addLiveRow(liveChunkCount, data);
+
+            if (data.gunshot_alert && !hasGunshotAlerted) {
+                hasGunshotAlerted = true;
+                alert("Gunshot detected in live audio!");
             }
-        };
 
-        recorder.onerror = (event) => {
-            reject(event.error || new Error("MediaRecorder error"));
-        };
-
-        recorder.onstop = () => {
-            resolve(new Blob(parts, { type: recorder.mimeType || "audio/webm" }));
-        };
-
-        recorder.start();
-        setTimeout(() => {
-            if (recorder.state !== "inactive") {
-                recorder.stop();
+            if (data.scream_alert && !hasScreamAlerted) {
+                hasScreamAlerted = true;
+                alert("Scream detected in live audio!");
             }
-        }, durationMs);
-    });
+        } catch (err) {
+            document.getElementById("status").innerText = "Live detection error";
+        } finally {
+            if (isLiveRunning && recorder && recorder.state === "inactive") {
+                recorder.start();
+                scheduleChunkStop();
+            }
+        }
+    };
+
+    recorder.start();
+    scheduleChunkStop();
 }
 
-function stopLive() {
-    liveRunning = false;
-
-    if (liveStream) {
-        liveStream.getTracks().forEach((track) => track.stop());
+function stopRec(){
+    if (!isLiveRunning) {
+        return;
     }
 
-    liveStream = null;
-    setStatus("Stopped");
-    document.getElementById("startLiveBtn").disabled = false;
-    document.getElementById("stopLiveBtn").disabled = true;
+    isLiveRunning = false;
+
+    if (chunkTimer) {
+        clearTimeout(chunkTimer);
+        chunkTimer = null;
+    }
+
+    if (recorder && recorder.state === "recording") {
+        recorder.stop();
+    }
+
+    if (streamRef) {
+        streamRef.getTracks().forEach(track => track.stop());
+    }
+
+    document.getElementById("status").innerText="Live recording stopped.";
+}
+
+function addLiveRow(index, data) {
+    document.getElementById("status").innerText = `Chunk ${index}: ${data.label}`;
 }
 </script>
 
