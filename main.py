@@ -11,11 +11,13 @@ from email.mime.multipart import MIMEMultipart
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 from utils import split_audio, preprocess_chunk as shared_preprocess_chunk
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 MODEL_PATH = "model/final_audio_model_v4.h5"
 model = tf.keras.models.load_model(MODEL_PATH)
@@ -48,11 +50,16 @@ SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "sahilbhandare80@gmail.com")
 SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "hxzbgdbbfopqhrme")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "sahilbhandare79@gmail.com")
 
+# Email config file for dynamic receiver email
+EMAIL_CONFIG_DIR = "config"
+EMAIL_CONFIG_FILE = os.path.join(EMAIL_CONFIG_DIR, "receiver_email.txt")
+
 # If a legacy file named uploaded_audio exists, switch to a safe folder name.
 if os.path.exists(UPLOAD_DIR) and not os.path.isdir(UPLOAD_DIR):
     UPLOAD_DIR = "uploaded_audio_dir"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(EMAIL_CONFIG_DIR, exist_ok=True)
 if SAVE_LIVE_CHUNKS_FOR_TESTING:
     os.makedirs(TEST_RAW_DIR, exist_ok=True)
     os.makedirs(TEST_WAV_DIR, exist_ok=True)
@@ -70,6 +77,37 @@ def _resolve_ffmpeg_path():
     return None
 
 
+def get_receiver_email():
+    """
+    Get the receiver email from config file or use default.
+    Returns the saved email address or the default RECIPIENT_EMAIL.
+    """
+    if os.path.exists(EMAIL_CONFIG_FILE):
+        try:
+            with open(EMAIL_CONFIG_FILE, 'r') as f:
+                email = f.read().strip()
+                if email and '@' in email:
+                    return email
+        except Exception as e:
+            print(f"[CONFIG] Error reading email config: {str(e)}")
+    
+    return RECIPIENT_EMAIL
+
+
+def set_receiver_email(email):
+    """
+    Save the receiver email to config file.
+    """
+    try:
+        os.makedirs(EMAIL_CONFIG_DIR, exist_ok=True)
+        with open(EMAIL_CONFIG_FILE, 'w') as f:
+            f.write(email.strip())
+        return True
+    except Exception as e:
+        print(f"[CONFIG] Error writing email config: {str(e)}")
+        return False
+
+
 def send_alert_email(label, detection_type="upload", score=None, probabilities=None):
     """
     Send an email alert when gunshot or scream is detected.
@@ -82,6 +120,9 @@ def send_alert_email(label, detection_type="upload", score=None, probabilities=N
     """
     if not EMAIL_ENABLED:
         return
+    
+    # Get the current receiver email
+    recipient = get_receiver_email()
     
     try:
         subject = f"🚨 ALERT: {label} Detected ({detection_type.upper()})"
@@ -111,7 +152,7 @@ Probabilities:
         
         msg = MIMEMultipart()
         msg['From'] = SENDER_EMAIL
-        msg['To'] = RECIPIENT_EMAIL
+        msg['To'] = recipient
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
         
@@ -120,7 +161,7 @@ Probabilities:
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
         
-        print(f"[EMAIL] Alert sent: {label}")
+        print(f"[EMAIL] Alert sent to {recipient}: {label}")
     except Exception as e:
         print(f"[EMAIL ERROR] Failed to send alert email: {str(e)}")
 
@@ -367,7 +408,34 @@ def save_upload_file(file: UploadFile):
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.post("/predict", response_class=HTMLResponse)
+@app.get("/api/get-receiver-email")
+async def get_email_endpoint():
+    """API endpoint to get the current receiver email"""
+    email = get_receiver_email()
+    return JSONResponse({"email": email})
+
+@app.post("/api/set-receiver-email")
+async def set_email_endpoint(request: Request):
+    """API endpoint to set the receiver email"""
+    try:
+        data = await request.json()
+        email = data.get("email", "").strip()
+        
+        if not email:
+            return JSONResponse({"error": "Email is required"}, status_code=400)
+        
+        if '@' not in email or '.' not in email.split('@')[1]:
+            return JSONResponse({"error": "Invalid email format"}, status_code=400)
+        
+        if set_receiver_email(email):
+            return JSONResponse({"success": True, "email": email})
+        else:
+            return JSONResponse({"error": "Failed to save email"}, status_code=500)
+    except Exception as e:
+        print(f"[API] Error setting email: {str(e)}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/predict")
 async def predict(request: Request, file: UploadFile = File(...)):
 
     path = save_upload_file(file)
@@ -383,9 +451,21 @@ async def predict(request: Request, file: UploadFile = File(...)):
         if os.path.exists(path):
             os.remove(path)
 
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "result": final,
+    # Calculate confidence score from chunks
+    confidence = 0.0
+    if chunks:
+        best_chunk = max(chunks, key=lambda x: max(x['gunshot'], x['scream']))
+        confidence = max(best_chunk['gunshot'], best_chunk['scream'])
+    
+    # Determine alert statuses
+    gunshot_alert = "Gunshot 🔫" in final
+    scream_alert = "Scream 😱" in final
+
+    return JSONResponse({
+        "label": final,
+        "confidence": confidence,
+        "gunshot_alert": gunshot_alert,
+        "scream_alert": scream_alert,
         "chunks": chunks
     })
 

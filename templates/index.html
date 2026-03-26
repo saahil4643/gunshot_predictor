@@ -1,365 +1,51 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Audio Detection</title>
-    <style>
-        :root {
-            --bg-start: #f7f2e8;
-            --bg-end: #e6efe9;
-            --card: #fffdf8;
-            --text: #1f2a2e;
-            --muted: #58656c;
-            --primary: #0f7b6c;
-            --primary-hover: #0c6559;
-            --danger: #b6413c;
-            --danger-hover: #973733;
-            --border: #d8e0db;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            color: var(--text);
-            background: linear-gradient(145deg, var(--bg-start), var(--bg-end));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-        }
-
-        .panel {
-            width: 100%;
-            max-width: 560px;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 28px;
-            box-shadow: 0 18px 40px rgba(23, 36, 34, 0.12);
-        }
-
-        h1 {
-            margin-top: 0;
-            margin-bottom: 8px;
-            font-size: 1.9rem;
-        }
-
-        p {
-            margin: 0 0 22px;
-            color: var(--muted);
-        }
-
-        .section {
-            text-align: left;
-            margin-bottom: 22px;
-        }
-
-        .section h3 {
-            margin: 0 0 10px;
-            font-size: 1.05rem;
-        }
-
-        input[type="file"] {
-            width: 100%;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 10px;
-            background: #ffffff;
-        }
-
-        .btn {
-            border: none;
-            color: #ffffff;
-            padding: 10px 16px;
-            border-radius: 10px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease, transform 0.2s ease;
-        }
-
-        .btn:hover {
-            transform: translateY(-1px);
-        }
-
-        .btn-primary {
-            background: var(--primary);
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-hover);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-        }
-
-        .btn-danger:hover {
-            background: var(--danger-hover);
-        }
-
-        .live-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        #status {
-            margin-top: 12px;
-            margin-bottom: 0;
-            font-weight: 600;
-            color: #2e3f45;
-        }
-
-        .result {
-            margin-top: 18px;
-            padding: 12px;
-            border-radius: 10px;
-            background: #eef7f4;
-            border: 1px solid #d2e6df;
-            font-weight: 600;
-            text-align: left;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <title>Distress Sound Detection Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
-
 <body>
-<main class="panel">
-    <h1>Audio Detection System</h1>
-    <p>Upload a file or run live microphone detection.</p>
-
-    <section class="section">
-        <h3>Upload Audio</h3>
-        <form action="/predict" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" required>
-            <br><br>
-            <button class="btn btn-primary" type="submit">Upload & Predict</button>
-        </form>
-    </section>
-
-    <section class="section">
-        <h3>Live Detection</h3>
-        <div class="live-actions">
-            <button class="btn btn-primary" onclick="startRec()">Start Live Detection</button>
-            <button class="btn btn-danger" onclick="stopRec()">Stop Live Detection</button>
+    <div id="bg-overlay"></div>
+    
+    <!-- Hamburger Menu -->
+    <div class="hamburger-menu">
+        <button id="hamburger-btn" class="hamburger-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Settings</h2>
+            <div class="settings-section">
+                <label for="receiver-email">Receiver Email:</label>
+                <input type="email" id="receiver-email" placeholder="Enter email address">
+                <button id="save-email-btn" class="save-btn">Save Email</button>
+                <div id="email-message"></div>
+            </div>
         </div>
-        <p id="status"></p>
-    </section>
+    </div>
+    
+    <div class="dashboard-container">
+        <h1>Real-Time Distress Sound Detection</h1>
+        <button id="live-indicator" class="offline">Offline</button>
+        <div id="meter-container">
+            <div id="level-bar"></div>
+        </div>
+        <div id="status-msg">Status: Normal</div>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" id="audio-file" name="audio" accept="audio/*">
+            <button type="submit">Upload Audio</button>
+        </form>
+        <div id="upload-result"></div>
+    </div>
 
-    {% if result %}
-    <div class="result">Final Result: {{ result }}</div>
-    {% endif %}
-</main>
-
-<script>
-let recorder;
-let streamRef;
-let liveChunkCount = 0;
-let hasGunshotAlerted = false;
-let hasScreamAlerted = false;
-let isLiveRunning = false;
-let chunkTimer = null;
-
-function interleaveTo16BitPCM(channelData) {
-    const pcm = new Int16Array(channelData.length);
-    for (let i = 0; i < channelData.length; i += 1) {
-        const s = Math.max(-1, Math.min(1, channelData[i]));
-        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-    }
-    return pcm;
-}
-
-function encodeWavFromFloat32(channelData, sampleRate) {
-    const pcm = interleaveTo16BitPCM(channelData);
-    const bytesPerSample = 2;
-    const numChannels = 1;
-    const blockAlign = numChannels * bytesPerSample;
-    const byteRate = sampleRate * blockAlign;
-    const dataSize = pcm.length * bytesPerSample;
-    const buffer = new ArrayBuffer(44 + dataSize);
-    const view = new DataView(buffer);
-
-    let offset = 0;
-    const writeString = (str) => {
-        for (let i = 0; i < str.length; i += 1) {
-            view.setUint8(offset + i, str.charCodeAt(i));
-        }
-        offset += str.length;
-    };
-
-    writeString("RIFF");
-    view.setUint32(offset, 36 + dataSize, true); offset += 4;
-    writeString("WAVE");
-    writeString("fmt ");
-    view.setUint32(offset, 16, true); offset += 4;
-    view.setUint16(offset, 1, true); offset += 2;
-    view.setUint16(offset, numChannels, true); offset += 2;
-    view.setUint32(offset, sampleRate, true); offset += 4;
-    view.setUint32(offset, byteRate, true); offset += 4;
-    view.setUint16(offset, blockAlign, true); offset += 2;
-    view.setUint16(offset, 16, true); offset += 2;
-    writeString("data");
-    view.setUint32(offset, dataSize, true); offset += 4;
-
-    for (let i = 0; i < pcm.length; i += 1) {
-        view.setInt16(offset, pcm[i], true);
-        offset += 2;
-    }
-
-    return new Blob([buffer], { type: "audio/wav" });
-}
-
-async function convertBlobToWav(blob) {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioCtx();
-    try {
-        const arrayBuffer = await blob.arrayBuffer();
-        const decoded = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
-
-        let mono = decoded.getChannelData(0);
-        if (decoded.numberOfChannels > 1) {
-            const right = decoded.getChannelData(1);
-            const mixed = new Float32Array(decoded.length);
-            for (let i = 0; i < decoded.length; i += 1) {
-                mixed[i] = 0.5 * (mono[i] + right[i]);
-            }
-            mono = mixed;
-        }
-
-        return encodeWavFromFloat32(mono, decoded.sampleRate);
-    } finally {
-        await audioCtx.close();
-    }
-}
-
-function chooseSupportedMimeType() {
-    const candidates = [
-        "audio/webm;codecs=opus",
-        "audio/webm",
-        "audio/ogg;codecs=opus"
-    ];
-
-    for (const type of candidates) {
-        if (MediaRecorder.isTypeSupported(type)) {
-            return type;
-        }
-    }
-
-    return "";
-}
-
-function scheduleChunkStop() {
-    if (!isLiveRunning || !recorder || recorder.state !== "recording") {
-        return;
-    }
-
-    chunkTimer = setTimeout(() => {
-        if (isLiveRunning && recorder && recorder.state === "recording") {
-            recorder.stop();
-        }
-    }, 3000);
-}
-
-async function startRec(){
-    if (isLiveRunning) {
-        return;
-    }
-
-    streamRef = await navigator.mediaDevices.getUserMedia({
-        audio: {
-            channelCount: 1,
-            noiseSuppression: false,
-            autoGainControl: false,
-            echoCancellation: false
-        }
-    });
-    const mimeType = chooseSupportedMimeType();
-    recorder = mimeType ? new MediaRecorder(streamRef, { mimeType }) : new MediaRecorder(streamRef);
-
-    isLiveRunning = true;
-    liveChunkCount = 0;
-    hasGunshotAlerted = false;
-    hasScreamAlerted = false;
-    document.getElementById("status").innerText="Live recording started (3s chunks)...";
-
-    recorder.ondataavailable = async (e) => {
-        if (!e.data || e.data.size === 0) {
-            if (isLiveRunning && recorder && recorder.state === "inactive") {
-                recorder.start();
-                scheduleChunkStop();
-            }
-            return;
-        }
-
-        liveChunkCount += 1;
-
-        try {
-            const wavBlob = await convertBlobToWav(e.data);
-            const formData = new FormData();
-            formData.append("file", wavBlob, `live_${liveChunkCount}.wav`);
-
-            const res = await fetch("/predict-live-chunk", {
-                method: "POST",
-                body: formData
-            });
-
-            const data = await res.json();
-            addLiveRow(liveChunkCount, data);
-
-            if (data.gunshot_alert && !hasGunshotAlerted) {
-                hasGunshotAlerted = true;
-                alert("Gunshot detected in live audio!");
-            }
-
-            if (data.scream_alert && !hasScreamAlerted) {
-                hasScreamAlerted = true;
-                alert("Scream detected in live audio!");
-            }
-        } catch (err) {
-            document.getElementById("status").innerText = "Live detection error";
-        } finally {
-            if (isLiveRunning && recorder && recorder.state === "inactive") {
-                recorder.start();
-                scheduleChunkStop();
-            }
-        }
-    };
-
-    recorder.start();
-    scheduleChunkStop();
-}
-
-function stopRec(){
-    if (!isLiveRunning) {
-        return;
-    }
-
-    isLiveRunning = false;
-
-    if (chunkTimer) {
-        clearTimeout(chunkTimer);
-        chunkTimer = null;
-    }
-
-    if (recorder && recorder.state === "recording") {
-        recorder.stop();
-    }
-
-    if (streamRef) {
-        streamRef.getTracks().forEach(track => track.stop());
-    }
-
-    document.getElementById("status").innerText="Live recording stopped.";
-}
-
-function addLiveRow(index, data) {
-    document.getElementById("status").innerText = `Chunk ${index}: ${data.label}`;
-}
-</script>
-
+    <script src="/static/dashboard.js"></script>
 </body>
 </html>

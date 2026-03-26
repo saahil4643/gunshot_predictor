@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  gunshot-detector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gunshot-detector
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SMTP_SERVER=smtp.gmail.com
+      - SMTP_PORT=587
+      - SENDER_EMAIL=${SENDER_EMAIL:-sahilbhandare80@gmail.com}
+      - SENDER_PASSWORD=${SENDER_PASSWORD:-hxzbgdbbfopqhrme}
+      - RECIPIENT_EMAIL=${RECIPIENT_EMAIL:-sahilbhandare79@gmail.com}
+    volumes:
+      - ./uploaded_audio:/app/uploaded_audio
+      - ./config:/app/config
+      - ./testing_chunks:/app/testing_chunks
+      - ./model:/app/model
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
