@@ -36,7 +36,7 @@ RUN mkdir -p config testing_chunks/live_chunks/raw testing_chunks/live_chunks/wa
 EXPOSE 8000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/').getcode() == 200 or exit(1)" || exit 1
 
 # Run the application with uvicorn

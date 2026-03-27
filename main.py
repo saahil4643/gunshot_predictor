@@ -32,19 +32,25 @@ class CompatibleInputLayer(tf.keras.layers.InputLayer):
         return super().from_config(config)
 
 
+class CompatibleDTypePolicy(tf.keras.mixed_precision.Policy):
+    @classmethod
+    def from_config(cls, config):
+        policy_name = config.get("name", "float32") if isinstance(config, dict) else "float32"
+        return tf.keras.mixed_precision.Policy(policy_name)
+
+
 def load_model_with_compat(model_path):
     try:
         return tf.keras.models.load_model(model_path, compile=False)
-    except TypeError as exc:
-        error_text = str(exc)
-        if "Unrecognized keyword arguments" not in error_text:
-            raise
-
-    return tf.keras.models.load_model(
-        model_path,
-        custom_objects={"InputLayer": CompatibleInputLayer},
-        compile=False,
-    )
+    except Exception:
+        return tf.keras.models.load_model(
+            model_path,
+            custom_objects={
+                "InputLayer": CompatibleInputLayer,
+                "DTypePolicy": CompatibleDTypePolicy,
+            },
+            compile=False,
+        )
 
 
 model = load_model_with_compat(MODEL_PATH)
