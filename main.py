@@ -39,6 +39,30 @@ class CompatibleDTypePolicy(tf.keras.mixed_precision.Policy):
         return tf.keras.mixed_precision.Policy(policy_name)
 
 
+def _sanitize_layer_config(config):
+    config = dict(config)
+    config.pop("quantization_config", None)
+    return config
+
+
+class CompatibleDense(tf.keras.layers.Dense):
+    @classmethod
+    def from_config(cls, config):
+        return super().from_config(_sanitize_layer_config(config))
+
+
+class CompatibleConv2D(tf.keras.layers.Conv2D):
+    @classmethod
+    def from_config(cls, config):
+        return super().from_config(_sanitize_layer_config(config))
+
+
+class CompatibleConv1D(tf.keras.layers.Conv1D):
+    @classmethod
+    def from_config(cls, config):
+        return super().from_config(_sanitize_layer_config(config))
+
+
 def load_model_with_compat(model_path):
     try:
         return tf.keras.models.load_model(model_path, compile=False)
@@ -48,6 +72,9 @@ def load_model_with_compat(model_path):
             custom_objects={
                 "InputLayer": CompatibleInputLayer,
                 "DTypePolicy": CompatibleDTypePolicy,
+                "Dense": CompatibleDense,
+                "Conv2D": CompatibleConv2D,
+                "Conv1D": CompatibleConv1D,
             },
             compile=False,
         )
