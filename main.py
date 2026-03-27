@@ -108,9 +108,260 @@ def set_receiver_email(email):
         return False
 
 
+def get_email_html_template(label, detection_type, timestamp, probabilities, score):
+    """
+    Generate a professional HTML email template for detection alerts.
+    """
+    gunshot_prob = probabilities.get('gunshot', 0.0) * 100 if probabilities else 0
+    scream_prob = probabilities.get('scream', 0.0) * 100 if probabilities else 0
+    background_prob = probabilities.get('background', 0.0) * 100 if probabilities else 0
+    score_percent = score * 100 if score is not None else 0
+    
+    # Determine colors based on label
+    alert_color = "#DC2626" if "Gunshot" in label else "#FF6B35"
+    icon = "🔫" if "Gunshot" in label else "📢"
+    
+    html_template = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 0 auto;
+                background-color: #ffffff;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }}
+            .header {{
+                background: linear-gradient(135deg, {alert_color} 0%, #8b1a1a 100%);
+                color: white;
+                padding: 30px;
+                text-align: center;
+            }}
+            .header h1 {{
+                margin: 0;
+                font-size: 28px;
+                font-weight: bold;
+            }}
+            .header p {{
+                margin: 10px 0 0 0;
+                font-size: 14px;
+                opacity: 0.9;
+            }}
+            .content {{
+                padding: 30px;
+            }}
+            .alert-section {{
+                background-color: #fef2f2;
+                border-left: 4px solid {alert_color};
+                padding: 16px;
+                margin-bottom: 20px;
+                border-radius: 4px;
+            }}
+            .info-grid {{
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-bottom: 20px;
+            }}
+            .info-item {{
+                background-color: #f9fafb;
+                padding: 15px;
+                border-radius: 6px;
+                border: 1px solid #e5e7eb;
+            }}
+            .info-label {{
+                font-size: 12px;
+                font-weight: 600;
+                color: #6b7280;
+                text-transform: uppercase;
+                margin-bottom: 5px;
+            }}
+            .info-value {{
+                font-size: 16px;
+                font-weight: 600;
+                color: #111827;
+            }}
+            .probabilities {{
+                background-color: #f9fafb;
+                padding: 20px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+                border: 1px solid #e5e7eb;
+            }}
+            .prob-title {{
+                font-size: 12px;
+                font-weight: 600;
+                color: #6b7280;
+                text-transform: uppercase;
+                margin-bottom: 12px;
+            }}
+            .prob-item {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+            }}
+            .prob-item:last-child {{
+                margin-bottom: 0;
+            }}
+            .prob-label {{
+                color: #374151;
+                font-weight: 500;
+            }}
+            .prob-bar {{
+                flex: 1;
+                margin: 0 15px;
+                height: 8px;
+                background-color: #e5e7eb;
+                border-radius: 4px;
+                overflow: hidden;
+            }}
+            .prob-fill {{
+                height: 100%;
+                background: linear-gradient(90deg, #3b82f6, #60a5fa);
+                border-radius: 4px;
+            }}
+            .prob-value {{
+                color: #111827;
+                font-weight: 600;
+                font-size: 14px;
+                min-width: 45px;
+                text-align: right;
+            }}
+            .gunshot-fill {{
+                background: linear-gradient(90deg, #dc2626, #ef4444) !important;
+            }}
+            .scream-fill {{
+                background: linear-gradient(90deg, #f97316, #fb923c) !important;
+            }}
+            .background-fill {{
+                background: linear-gradient(90deg, #10b981, #34d399) !important;
+            }}
+            .action-section {{
+                background-color: #eff6ff;
+                border-left: 4px solid #3b82f6;
+                padding: 16px;
+                margin-bottom: 20px;
+                border-radius: 4px;
+            }}
+            .action-section p {{
+                margin: 0;
+                color: #1e40af;
+                font-size: 14px;
+            }}
+            .footer {{
+                background-color: #f9fafb;
+                border-top: 1px solid #e5e7eb;
+                padding: 20px;
+                text-align: center;
+                font-size: 12px;
+                color: #6b7280;
+            }}
+            .timestamp {{
+                color: #9ca3af;
+                font-size: 12px;
+                margin-top: 5px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>{icon} DETECTION ALERT</h1>
+                <p>{label.strip()} detected</p>
+            </div>
+            
+            <div class="content">
+                <div class="alert-section">
+                    <strong>⚠️ {label.upper()} Detection Confirmed</strong>
+                    <p style="margin: 8px 0 0 0; font-size: 14px;">A {label.lower().strip()} event has been detected in your audio stream.</p>
+                </div>
+                
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Detection Type</div>
+                        <div class="info-value">{detection_type.upper()}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Status</div>
+                        <div class="info-value" style="color: {alert_color};">ACTIVE</div>
+                    </div>
+                </div>
+                
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Detection Label</div>
+                        <div class="info-value">{label.strip()}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Confidence Score</div>
+                        <div class="info-value">{score_percent:.2f}%</div>
+                    </div>
+                </div>
+                
+                <div class="probabilities">
+                    <div class="prob-title">📊 Detection Probabilities</div>
+                    
+                    <div class="prob-item">
+                        <span class="prob-label">🔫 Gunshot</span>
+                        <div class="prob-bar">
+                            <div class="prob-fill gunshot-fill" style="width: {min(gunshot_prob, 100)}%"></div>
+                        </div>
+                        <span class="prob-value">{gunshot_prob:.2f}%</span>
+                    </div>
+                    
+                    <div class="prob-item">
+                        <span class="prob-label">📢 Scream</span>
+                        <div class="prob-bar">
+                            <div class="prob-fill scream-fill" style="width: {min(scream_prob, 100)}%"></div>
+                        </div>
+                        <span class="prob-value">{scream_prob:.2f}%</span>
+                    </div>
+                    
+                    <div class="prob-item">
+                        <span class="prob-label">🔊 Background</span>
+                        <div class="prob-bar">
+                            <div class="prob-fill background-fill" style="width: {min(background_prob, 100)}%"></div>
+                        </div>
+                        <span class="prob-value">{background_prob:.2f}%</span>
+                    </div>
+                </div>
+                
+                <div class="action-section">
+                    <p><strong>ℹ️ Action Required</strong></p>
+                    <p>Please check the audio stream and take appropriate action if necessary. Review the detection details above for more information.</p>
+                </div>
+                
+                <div class="timestamp">
+                    <strong>Timestamp:</strong> {timestamp}
+                </div>
+            </div>
+            
+            <div class="footer">
+                <p>🎙️ Gunshot & Scream Detection System</p>
+                <p style="margin: 5px 0 0 0;">This is an automated alert. Do not reply to this email.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_template
+
+
 def send_alert_email(label, detection_type="upload", score=None, probabilities=None):
     """
-    Send an email alert when gunshot or scream is detected.
+    Send an email alert when gunshot or scream is detected with professional HTML template.
     
     Args:
         label: Detection label (e.g., "Gunshot ", "Scream ")
@@ -126,36 +377,21 @@ def send_alert_email(label, detection_type="upload", score=None, probabilities=N
     
     try:
         subject = f"🚨 ALERT: {label} Detected ({detection_type.upper()})"
+        timestamp = __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        body = f"""
-Gunshot/Scream Detection Alert
-==============================
-
-Detection Type: {detection_type.upper()}
-Label: {label}
-Timestamp: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-"""
+        # Generate HTML email body
+        html_body = get_email_html_template(label, detection_type, timestamp, probabilities or {}, score)
         
-        if probabilities:
-            body += f"""
-Probabilities:
-- Gunshot: {probabilities.get('gunshot', 0.0):.4f}
-- Scream: {probabilities.get('scream', 0.0):.4f}
-- Background: {probabilities.get('background', 0.0):.4f}
-"""
-        
-        if score is not None:
-            body += f"\nConfidence Score: {score:.4f}"
-        
-        body += "\n\nPlease check and take appropriate action if necessary."
-        
-        msg = MIMEMultipart()
+        # Create email message
+        msg = MIMEMultipart('alternative')
         msg['From'] = SENDER_EMAIL
         msg['To'] = recipient
         msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
         
+        # Attach HTML version
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        # Send email
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
