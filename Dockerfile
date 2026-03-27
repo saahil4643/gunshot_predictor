@@ -27,7 +27,9 @@ RUN pip install --upgrade pip setuptools wheel && \
 COPY . .
 
 # Create directories for runtime files
-RUN mkdir -p config testing_chunks/live_chunks/{raw,wav} uploaded_audio && \
+RUN mkdir -p config testing_chunks/live_chunks/raw testing_chunks/live_chunks/wav && \
+    if [ -f uploaded_audio ]; then rm -f uploaded_audio; fi && \
+    mkdir -p uploaded_audio && \
     chmod -R 755 config testing_chunks uploaded_audio
 
 # Expose port
