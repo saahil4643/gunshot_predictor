@@ -20,7 +20,34 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 MODEL_PATH = "model/final_audio_model_v4.h5"
-model = tf.keras.models.load_model(MODEL_PATH)
+
+
+class CompatibleInputLayer(tf.keras.layers.InputLayer):
+    @classmethod
+    def from_config(cls, config):
+        config = dict(config)
+        if "batch_shape" in config and "batch_input_shape" not in config:
+            config["batch_input_shape"] = tuple(config.pop("batch_shape"))
+        config.pop("optional", None)
+        return super().from_config(config)
+
+
+def load_model_with_compat(model_path):
+    try:
+        return tf.keras.models.load_model(model_path, compile=False)
+    except TypeError as exc:
+        error_text = str(exc)
+        if "Unrecognized keyword arguments" not in error_text:
+            raise
+
+    return tf.keras.models.load_model(
+        model_path,
+        custom_objects={"InputLayer": CompatibleInputLayer},
+        compile=False,
+    )
+
+
+model = load_model_with_compat(MODEL_PATH)
 
 SAMPLE_RATE = 22050
 CHUNK_SECONDS = 3
