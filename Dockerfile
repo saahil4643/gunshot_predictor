@@ -37,8 +37,8 @@ RUN mkdir -p config testing_chunks/live_chunks/raw testing_chunks/live_chunks/wa
 EXPOSE 6990
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
-    CMD python -c "import os, urllib.request; port = os.getenv('PORT', '6990'); urllib.request.urlopen(f'http://localhost:{port}/').getcode() == 200 or exit(1)" || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=8 \
+    CMD sh -c 'curl -fsS "http://127.0.0.1:${PORT:-6990}/healthz" > /dev/null || exit 1'
 
 # Run the application with uvicorn
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-6990}"]

@@ -700,6 +700,10 @@ def save_upload_file(file: UploadFile):
 # ==============================
 # ROUTES
 # ==============================
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
