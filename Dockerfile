@@ -11,6 +11,7 @@ WORKDIR /app
 
 # Install system dependencies for audio processing and ffmpeg
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     ffmpeg \
     libsndfile1 \
     libsndfile1-dev \
@@ -37,7 +38,7 @@ EXPOSE 6990
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/').getcode() == 200 or exit(1)" || exit 1
+    CMD python -c "import os, urllib.request; port = os.getenv('PORT', '6990'); urllib.request.urlopen(f'http://localhost:{port}/').getcode() == 200 or exit(1)" || exit 1
 
 # Run the application with uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "6990"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-6990}"]
