@@ -1,9 +1,16 @@
 # Directories
 uploaded_audio/
+uploaded_audio
 testing_chunks/
+testing_chunks
 uploaded_audio_dir/
+uploaded_audio_dir
 __pycache__/
-
+training_data/
+input_audio/
+input_audio
+audio.webm
+temp.wav
 # Python
 *.py[cod]
 *$py.class

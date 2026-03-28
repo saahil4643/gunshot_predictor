@@ -33,7 +33,7 @@ start_app() {
     docker-compose up -d
     echo "✅ Application started!"
     echo ""
-    echo "📍 Dashboard available at: http://localhost:8000"
+    echo "📍 Dashboard available at: http://localhost:6990"
     echo ""
     sleep 2
     docker-compose logs

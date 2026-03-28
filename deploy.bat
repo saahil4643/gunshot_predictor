@@ -46,7 +46,7 @@ if errorlevel 1 (
 )
 echo ✅ Application started!
 echo.
-echo 📍 Dashboard available at: http://localhost:8000
+echo 📍 Dashboard available at: http://localhost:6990
 echo.
 timeout /t 2 >nul
 docker-compose logs

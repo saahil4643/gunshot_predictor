@@ -47,7 +47,7 @@ docker-compose up -d
 docker-compose logs -f gunshot-detector
 ```
 
-The application will be available at: `http://localhost:8000`
+The application will be available at: `http://localhost:6990`
 
 ## Docker Build Directly
 
@@ -58,7 +58,7 @@ docker build -t gunshot-detector:latest .
 # Run container
 docker run -d \
   --name gunshot-detector \
-  -p 8000:8000 \
+  -p 6990:6990 \
   -v $(pwd)/uploaded_audio:/app/uploaded_audio \
   -v $(pwd)/config:/app/config \
   -v $(pwd)/testing_chunks:/app/testing_chunks \
@@ -107,7 +107,7 @@ az container create \
   --resource-group <group> \
   --name gunshot-detector \
   --image gunshot-detector:latest \
-  --ports 8000 \
+  --ports 6990 \
   --environment-variables SENDER_EMAIL=<email> SENDER_PASSWORD=<password>
 ```
 
@@ -168,9 +168,9 @@ Ensure `model/` directory contains:
 
 ## Port Configuration
 
-Default port is `8000`. To change:
+Default port is `6990`. To change:
 1. Update `docker-compose.yml` port mapping
-2. Or pass `-p <new_port>:8000` to docker run
+2. Or pass `-p <new_port>:6990` to docker run
 
 ## Next Steps
 

@@ -12,7 +12,7 @@ This directory now contains everything needed for production deployment of the G
    - Health checks included
    - Proper signal handling with exec form CMD
    - Creates necessary directories
-   - Exposes port 8000
+   - Exposes port 6990
 
 2. **requirements.txt** ✅ Updated
    - Added FastAPI and uvicorn (web framework)
@@ -107,7 +107,7 @@ docker-compose ps
 - [ ] Configure email settings in .env
 - [ ] Verify model files exist in model/ directory
 - [ ] Test locally with `docker-compose up -d`
-- [ ] Test health check: `curl http://localhost:8000/`
+- [ ] Test health check: `curl http://localhost:6990/`
 - [ ] Verify volumes are properly mounted
 
 ### Security
@@ -115,7 +115,7 @@ docker-compose ps
 - [ ] Remove hardcoded credentials from code
 - [ ] Never commit .env file to git
 - [ ] Use strong app passwords (Gmail)
-- [ ] Set firewall rules for port 8000
+- [ ] Set firewall rules for port 6990
 - [ ] Enable Docker security scanning
 - [ ] Use secrets manager (AWS/Azure/GCP)
 
@@ -153,7 +153,7 @@ See DEPLOYMENT.md for detailed instructions
 ### Self-Hosted (On-Premises)
 ```bash
 docker run -d --name gunshot-detector \
-  -p 8000:8000 \
+   -p 6990:6990 \
   -v /data/uploaded:/app/uploaded_audio \
   -v /data/config:/app/config \
   -e SENDER_EMAIL="..." \
@@ -171,7 +171,7 @@ docker-compose ps
 docker inspect gunshot-detector
 
 # Test API endpoint
-curl http://localhost:8000/
+curl http://localhost:6990/
 
 # View logs
 docker-compose logs
@@ -186,7 +186,7 @@ Required:
 Optional:
 - `SMTP_SERVER` - Default: smtp.gmail.com
 - `SMTP_PORT` - Default: 587
-- `PORT` - Default: 8000
+- `PORT` - Default: 6990
 
 ## 🛠️ Common Operations
 
@@ -265,7 +265,7 @@ docker-compose logs gunshot-detector
 ### Port Already in Use
 ```bash
 # Change port in docker-compose.yml or:
-docker run -p 9000:8000 gunshot-detector:latest
+docker run -p 9000:6990 gunshot-detector:latest
 ```
 
 ### Model Files Missing
@@ -280,7 +280,7 @@ final_gunshot_model.h5
 1. Check .env configuration
 2. Verify Gmail app password
 3. Enable "Less secure app access" if needed
-4. Test with: `curl http://localhost:8000/`
+4. Test with: `curl http://localhost:6990/`
 
 ## 📚 Additional Resources
 
