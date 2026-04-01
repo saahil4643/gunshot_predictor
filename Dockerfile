@@ -4,6 +4,7 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive \
     PORT=6990
 
 # Set work directory
@@ -14,8 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ffmpeg \
     libsndfile1 \
-    libsndfile1-dev \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
