@@ -5,6 +5,258 @@ let hasGunshotAlerted = false;
 let hasScreamAlerted = false;
 let isLiveRunning = false;
 let chunkTimer = null;
+let audioContextRef = null;
+let analyserRef = null;
+let waveformDataRef = null;
+let waveformAnimationRef = null;
+let waveformCanvasRef = null;
+let waveformCtxRef = null;
+let sourceNodeRef = null;
+const MAX_DETECTION_LOGS = 50;
+let logRefreshTimer = null;
+
+function getDetectionTimestamp() {
+    return new Date().toLocaleString([], {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+    });
+}
+
+function addDetectionLog(eventType, source) {
+    const logList = document.getElementById("detection-log-list");
+    if (!logList) {
+        return;
+    }
+
+    const empty = logList.querySelector(".empty-log");
+    if (empty) {
+        empty.remove();
+    }
+
+    const item = document.createElement("li");
+    const eventClass = eventType.toLowerCase();
+    item.innerHTML = `<span class="log-event"><span class="log-badge ${eventClass}">${eventType}</span> detected (${source})</span><span class="log-time">${getDetectionTimestamp()}</span>`;
+    logList.prepend(item);
+
+    while (logList.children.length > MAX_DETECTION_LOGS) {
+        logList.removeChild(logList.lastElementChild);
+    }
+}
+
+function clearDetectionLog() {
+    const logList = document.getElementById("detection-log-list");
+    if (!logList) {
+        return;
+    }
+
+    logList.innerHTML = '<li class="empty-log">No detections yet</li>';
+}
+
+function renderDetectionLogs(logs) {
+    const logList = document.getElementById("detection-log-list");
+    if (!logList) {
+        return;
+    }
+
+    if (!Array.isArray(logs) || logs.length === 0) {
+        logList.innerHTML = '<li class="empty-log">No detections yet</li>';
+        return;
+    }
+
+    const trimmed = logs.slice(0, MAX_DETECTION_LOGS);
+    const fragment = document.createDocumentFragment();
+
+    for (const item of trimmed) {
+        const li = document.createElement("li");
+
+        const eventWrap = document.createElement("span");
+        eventWrap.className = "log-event";
+
+        const badge = document.createElement("span");
+        const eventType = String(item.event || "Event");
+        badge.className = `log-badge ${eventType.toLowerCase()}`;
+        badge.textContent = eventType;
+
+        const source = String(item.source || "Unknown");
+        eventWrap.appendChild(badge);
+        eventWrap.append(` detected (${source})`);
+
+        const time = document.createElement("span");
+        time.className = "log-time";
+        time.textContent = String(item.timestamp || "-");
+
+        li.appendChild(eventWrap);
+        li.appendChild(time);
+        fragment.appendChild(li);
+    }
+
+    logList.innerHTML = "";
+    logList.appendChild(fragment);
+}
+
+async function refreshDetectionLogs() {
+    try {
+        const response = await fetch("/api/detection-logs", { cache: "no-store" });
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+        renderDetectionLogs(data.logs || []);
+    } catch (err) {
+        console.error("Failed to refresh detection logs:", err);
+    }
+}
+
+function updateChipState(chipId, text, stateClass) {
+    const chip = document.getElementById(chipId);
+    if (!chip) {
+        return;
+    }
+
+    chip.textContent = text;
+    chip.classList.remove("clear", "alert", "neutral");
+    chip.classList.add(stateClass);
+}
+
+function updateDetectionPanel(gunshotDetected, screamDetected) {
+    if (gunshotDetected) {
+        updateChipState("gunshot-chip", "Detected", "alert");
+    } else {
+        updateChipState("gunshot-chip", "Clear", "clear");
+    }
+
+    if (screamDetected) {
+        updateChipState("scream-chip", "Detected", "alert");
+    } else {
+        updateChipState("scream-chip", "Clear", "clear");
+    }
+
+    if (gunshotDetected || screamDetected) {
+        updateChipState("overall-chip", "Alert", "alert");
+    } else if (isLiveRunning) {
+        updateChipState("overall-chip", "Monitoring", "neutral");
+    } else {
+        updateChipState("overall-chip", "Idle", "neutral");
+    }
+}
+
+function resetWaveformCanvas() {
+    if (!waveformCanvasRef || !waveformCtxRef) {
+        return;
+    }
+
+    const width = waveformCanvasRef.width;
+    const height = waveformCanvasRef.height;
+
+    waveformCtxRef.clearRect(0, 0, width, height);
+    waveformCtxRef.fillStyle = "#11262c";
+    waveformCtxRef.fillRect(0, 0, width, height);
+    waveformCtxRef.strokeStyle = "rgba(77, 217, 190, 0.45)";
+    waveformCtxRef.lineWidth = 2;
+    waveformCtxRef.beginPath();
+    waveformCtxRef.moveTo(0, height / 2);
+    waveformCtxRef.lineTo(width, height / 2);
+    waveformCtxRef.stroke();
+}
+
+function drawWaveform() {
+    if (!analyserRef || !waveformDataRef || !waveformCanvasRef || !waveformCtxRef) {
+        return;
+    }
+
+    const pixelRatio = window.devicePixelRatio || 1;
+    const targetWidth = Math.floor(waveformCanvasRef.clientWidth * pixelRatio);
+    const targetHeight = Math.floor(waveformCanvasRef.clientHeight * pixelRatio);
+
+    if (waveformCanvasRef.width !== targetWidth || waveformCanvasRef.height !== targetHeight) {
+        waveformCanvasRef.width = targetWidth;
+        waveformCanvasRef.height = targetHeight;
+    }
+
+    analyserRef.getByteTimeDomainData(waveformDataRef);
+
+    const width = waveformCanvasRef.width;
+    const height = waveformCanvasRef.height;
+
+    waveformCtxRef.fillStyle = "#11262c";
+    waveformCtxRef.fillRect(0, 0, width, height);
+
+    waveformCtxRef.strokeStyle = "#56f5d5";
+    waveformCtxRef.lineWidth = 2;
+    waveformCtxRef.beginPath();
+
+    const sliceWidth = width / waveformDataRef.length;
+    let x = 0;
+
+    for (let i = 0; i < waveformDataRef.length; i += 1) {
+        const v = waveformDataRef[i] / 128.0;
+        const y = (v * height) / 2;
+
+        if (i === 0) {
+            waveformCtxRef.moveTo(x, y);
+        } else {
+            waveformCtxRef.lineTo(x, y);
+        }
+
+        x += sliceWidth;
+    }
+
+    waveformCtxRef.lineTo(width, height / 2);
+    waveformCtxRef.stroke();
+
+    waveformAnimationRef = requestAnimationFrame(drawWaveform);
+}
+
+async function startWaveform(stream) {
+    waveformCanvasRef = document.getElementById("mic-waveform");
+    if (!waveformCanvasRef) {
+        return;
+    }
+
+    waveformCtxRef = waveformCanvasRef.getContext("2d");
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    audioContextRef = new AudioCtx();
+
+    if (audioContextRef.state === "suspended") {
+        await audioContextRef.resume();
+    }
+
+    analyserRef = audioContextRef.createAnalyser();
+    analyserRef.fftSize = 2048;
+    analyserRef.smoothingTimeConstant = 0.85;
+
+    waveformDataRef = new Uint8Array(analyserRef.frequencyBinCount);
+    sourceNodeRef = audioContextRef.createMediaStreamSource(stream);
+    sourceNodeRef.connect(analyserRef);
+
+    drawWaveform();
+}
+
+async function stopWaveform() {
+    if (waveformAnimationRef) {
+        cancelAnimationFrame(waveformAnimationRef);
+        waveformAnimationRef = null;
+    }
+
+    if (sourceNodeRef) {
+        sourceNodeRef.disconnect();
+        sourceNodeRef = null;
+    }
+
+    if (audioContextRef) {
+        await audioContextRef.close();
+        audioContextRef = null;
+    }
+
+    analyserRef = null;
+    waveformDataRef = null;
+    resetWaveformCanvas();
+}
 
 // Audio conversion utilities
 function interleaveTo16BitPCM(channelData) {
@@ -130,9 +382,12 @@ async function startRec() {
         liveChunkCount = 0;
         hasGunshotAlerted = false;
         hasScreamAlerted = false;
+        updateDetectionPanel(false, false);
+
+        await startWaveform(streamRef);
 
         updateLiveIndicator(true);
-        updateStatusMsg("Live recording started");
+        updateStatusMsg("Monitoring live microphone");
 
         recorder.ondataavailable = async (e) => {
             if (!e.data || e.data.size === 0) {
@@ -166,6 +421,9 @@ async function startRec() {
                     hasScreamAlerted = true;
                     alert("Scream detected in live audio!");
                 }
+
+                updateDetectionPanel(hasGunshotAlerted, hasScreamAlerted);
+                await refreshDetectionLogs();
             } catch (err) {
                 updateStatusMsg("Live detection error");
                 console.error(err);
@@ -181,6 +439,7 @@ async function startRec() {
         scheduleChunkStop();
     } catch (err) {
         updateStatusMsg("Failed to access microphone");
+        updateDetectionPanel(false, false);
         console.error(err);
     }
 }
@@ -203,10 +462,14 @@ function stopRec() {
 
     if (streamRef) {
         streamRef.getTracks().forEach(track => track.stop());
+        streamRef = null;
     }
+
+    stopWaveform().catch(err => console.error("Waveform stop failed:", err));
 
     updateLiveIndicator(false);
     updateStatusMsg("Live recording stopped");
+    updateDetectionPanel(hasGunshotAlerted, hasScreamAlerted);
 }
 
 // UI Update functions
@@ -227,7 +490,10 @@ function updateStatusMsg(message) {
     if (typeof message === "string" && message.toLowerCase().includes("chunk")) {
         return;
     }
-    document.getElementById("status-msg").textContent = `Status: ${message}`;
+    const statusEl = document.getElementById("status-msg");
+    if (statusEl) {
+        statusEl.textContent = `Status: ${message}`;
+    }
 }
 
 function updateLiveResult(chunkIndex, data) {
@@ -236,6 +502,27 @@ function updateLiveResult(chunkIndex, data) {
 
 // Live indicator button handler
 document.addEventListener("DOMContentLoaded", function () {
+    resetWaveformCanvas();
+    updateDetectionPanel(false, false);
+    refreshDetectionLogs();
+
+    if (!logRefreshTimer) {
+        logRefreshTimer = setInterval(refreshDetectionLogs, 2000);
+    }
+
+    const clearLogBtn = document.getElementById("clear-log-btn");
+    if (clearLogBtn) {
+        clearLogBtn.addEventListener("click", async function () {
+            clearDetectionLog();
+            try {
+                await fetch("/api/clear-detection-logs", { method: "POST" });
+                await refreshDetectionLogs();
+            } catch (err) {
+                console.error("Failed to clear server log file:", err);
+            }
+        });
+    }
+
     const liveButton = document.getElementById("live-indicator");
     
     if (liveButton) {
@@ -387,21 +674,29 @@ document.addEventListener("DOMContentLoaded", function () {
                     resultDiv.classList.remove("error");
                     updateStatusMsg("Analysis complete");
 
+                    const gunshotDetected = Boolean(data.gunshot_alert);
+                    const screamDetected = Boolean(data.scream_alert);
+                    updateDetectionPanel(gunshotDetected, screamDetected);
+
                     if (data.gunshot_alert) {
                         alert("Gunshot detected!");
                     }
                     if (data.scream_alert) {
                         alert("Scream detected!");
                     }
+
+                    await refreshDetectionLogs();
                 } else {
                     resultDiv.textContent = `Error: ${data.error || data.label || "Unknown error"}`;
                     resultDiv.classList.add("error");
                     updateStatusMsg("Analysis failed");
+                    updateDetectionPanel(false, false);
                 }
             } catch (error) {
                 resultDiv.textContent = "Error during upload: " + error.message;
                 resultDiv.classList.add("error");
                 updateStatusMsg("Upload error");
+                updateDetectionPanel(false, false);
                 console.error("Upload error:", error);
             }
         });

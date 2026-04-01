@@ -5,6 +5,8 @@ import subprocess
 import os
 import uuid
 import shutil
+import tempfile
+from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -103,6 +105,8 @@ TEST_RAW_DIR = os.path.join(TEST_CHUNKS_DIR, "raw")
 TEST_WAV_DIR = os.path.join(TEST_CHUNKS_DIR, "wav")
 TEST_AUDIO_RECEIVED_DIR = os.path.join(TEST_CHUNKS_DIR, "audio_received")
 TEST_AUDIO_TO_MODEL_DIR = os.path.join(TEST_CHUNKS_DIR, "audio_to_model")
+DETECTION_LOG_FILE = os.path.join(tempfile.gettempdir(), "gunshot_predictor_detection_events.tmp.txt")
+MAX_DETECTION_LOG_LINES = 200
 
 # Email Configuration
 EMAIL_ENABLED = True  # Set to False to disable email notifications
@@ -715,6 +719,54 @@ def save_upload_file(file: UploadFile):
     file_name = f"{uuid.uuid4().hex}{ext}"
     return os.path.join(UPLOAD_DIR, file_name)
 
+
+def append_detection_log(event_type: str, source: str) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"{timestamp}\t{event_type}\t{source}\n"
+
+    with open(DETECTION_LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(line)
+
+    try:
+        with open(DETECTION_LOG_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        if len(lines) > MAX_DETECTION_LOG_LINES:
+            with open(DETECTION_LOG_FILE, "w", encoding="utf-8") as f:
+                f.writelines(lines[-MAX_DETECTION_LOG_LINES:])
+    except OSError:
+        pass
+
+
+def read_detection_logs(limit: int = 50):
+    if not os.path.exists(DETECTION_LOG_FILE):
+        return []
+
+    logs = []
+    try:
+        with open(DETECTION_LOG_FILE, "r", encoding="utf-8") as f:
+            for raw in f:
+                parts = raw.rstrip("\n").split("\t")
+                if len(parts) != 3:
+                    continue
+                logs.append({
+                    "timestamp": parts[0],
+                    "event": parts[1],
+                    "source": parts[2]
+                })
+    except OSError:
+        return []
+
+    logs.reverse()
+    return logs[:limit]
+
+
+def clear_detection_logs() -> None:
+    try:
+        if os.path.exists(DETECTION_LOG_FILE):
+            os.remove(DETECTION_LOG_FILE)
+    except OSError:
+        pass
+
 # ==============================
 # ROUTES
 # ==============================
@@ -724,7 +776,21 @@ def healthz():
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "logs": read_detection_logs()
+    })
+
+
+@app.get("/api/detection-logs")
+def get_detection_logs():
+    return JSONResponse({"logs": read_detection_logs()})
+
+
+@app.post("/api/clear-detection-logs")
+def clear_detection_logs_api():
+    clear_detection_logs()
+    return JSONResponse({"success": True})
 
 @app.get("/api/get-receiver-email")
 async def get_email_endpoint():
@@ -779,6 +845,11 @@ async def predict(request: Request, file: UploadFile = File(...)):
     gunshot_alert = "Gunshot " in final
     scream_alert = "Scream " in final
 
+    if gunshot_alert:
+        append_detection_log("Gunshot", "Upload")
+    if scream_alert:
+        append_detection_log("Scream", "Upload")
+
     return JSONResponse({
         "label": final,
         "confidence": confidence,
@@ -807,7 +878,8 @@ async def predict_live(request: Request, file: UploadFile = File(...)):
     return templates.TemplateResponse("index.html", {
         "request": request,
         "result": final,
-        "chunks": chunks
+        "chunks": chunks,
+        "logs": read_detection_logs()
     })
 
 
@@ -861,5 +933,10 @@ async def predict_live_chunk(file: UploadFile = File(...)):
 
     if SAVE_LIVE_CHUNKS_FOR_TESTING:
         result["debug_chunk"] = debug_id
+
+    if result.get("gunshot_alert"):
+        append_detection_log("Gunshot", "Live")
+    if result.get("scream_alert"):
+        append_detection_log("Scream", "Live")
 
     return JSONResponse(result)
