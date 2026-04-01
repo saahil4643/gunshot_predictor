@@ -101,6 +101,8 @@ SAVE_LIVE_CHUNKS_FOR_TESTING = True
 TEST_CHUNKS_DIR = os.path.join("testing_chunks", "live_chunks")
 TEST_RAW_DIR = os.path.join(TEST_CHUNKS_DIR, "raw")
 TEST_WAV_DIR = os.path.join(TEST_CHUNKS_DIR, "wav")
+TEST_AUDIO_RECEIVED_DIR = os.path.join(TEST_CHUNKS_DIR, "audio_received")
+TEST_AUDIO_TO_MODEL_DIR = os.path.join(TEST_CHUNKS_DIR, "audio_to_model")
 
 # Email Configuration
 EMAIL_ENABLED = True  # Set to False to disable email notifications
@@ -123,6 +125,8 @@ os.makedirs(EMAIL_CONFIG_DIR, exist_ok=True)
 if SAVE_LIVE_CHUNKS_FOR_TESTING:
     os.makedirs(TEST_RAW_DIR, exist_ok=True)
     os.makedirs(TEST_WAV_DIR, exist_ok=True)
+    os.makedirs(TEST_AUDIO_RECEIVED_DIR, exist_ok=True)
+    os.makedirs(TEST_AUDIO_TO_MODEL_DIR, exist_ok=True)
 
 
 def _resolve_ffmpeg_path():
@@ -488,12 +492,12 @@ def _load_audio_for_prediction(
     path,
     min_seconds=0.0,
     debug_wav_path=None,
-    gain_db=UPLOAD_GAIN_DB,
+    gain_db=0,
     use_live_shaping=False
 ):
     wav = os.path.splitext(path)[0] + "_converted.wav"
     try:
-        filter_chain = LIVE_SHAPING_FILTER if use_live_shaping else None
+        filter_chain = None
         convert_to_wav(path, wav, gain_db=gain_db, filter_chain=filter_chain)
 
         if debug_wav_path:
@@ -521,18 +525,13 @@ def _load_audio_for_prediction(
 # ==============================
 # CONVERT
 # ==============================
-def convert_to_wav(input_path, output_path, gain_db=UPLOAD_GAIN_DB, filter_chain=None):
+def convert_to_wav(input_path, output_path, gain_db=0, filter_chain=None):
 
     ffmpeg_path = _resolve_ffmpeg_path()
     if not ffmpeg_path:
         raise RuntimeError("ffmpeg_not_found")
 
-    if filter_chain:
-        audio_filter = f"{filter_chain},volume={gain_db}dB"
-    else:
-        audio_filter = f"loudnorm,volume={gain_db}dB"
-
-    result = subprocess.run([
+    cmd = [
         ffmpeg_path,
         "-hide_banner",
         "-loglevel", "error",
@@ -544,10 +543,11 @@ def convert_to_wav(input_path, output_path, gain_db=UPLOAD_GAIN_DB, filter_chain
         "-acodec", "pcm_s16le",
         "-ac", "1",
         "-ar", str(SAMPLE_RATE),
-        "-af", audio_filter,
         "-f", "wav",
         "-y", output_path
-    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    ]
+
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     if result.returncode != 0 or not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
         stderr_lines = [line.strip() for line in result.stderr.splitlines() if line.strip()]
@@ -562,7 +562,7 @@ def convert_to_wav(input_path, output_path, gain_db=UPLOAD_GAIN_DB, filter_chain
 # ==============================
 def predict_audio(path):
 
-    audio = _load_audio_for_prediction(path, gain_db=UPLOAD_GAIN_DB)
+    audio = _load_audio_for_prediction(path)
     chunks = split_audio(audio)
 
     results = []
@@ -610,16 +610,25 @@ def predict_audio(path):
     return best_label, results
 
 
-def predict_single_live_chunk(path, debug_wav_path=None):
+def predict_single_live_chunk(path, debug_wav_path=None, debug_audio_received_path=None, debug_audio_to_model_path=None):
 
     audio = _load_audio_for_prediction(
         path,
         min_seconds=LIVE_MIN_SECONDS,
-        debug_wav_path=debug_wav_path,
-        gain_db=LIVE_GAIN_DB,
-        use_live_shaping=True
+        debug_wav_path=debug_wav_path
     )
+    
+    # Save audio received (after WAV conversion, before preprocessing)
+    if debug_audio_received_path:
+        try:
+            os.makedirs(os.path.dirname(debug_audio_received_path), exist_ok=True)
+            import soundfile as sf
+            sf.write(debug_audio_received_path, audio, SAMPLE_RATE)
+        except Exception as e:
+            print(f"[DEBUG] Failed to save audio_received: {str(e)}")
+    
     chunks = split_audio(audio)
+    preprocessed_chunks = []
 
     best = {
         "gunshot": 0.0,
@@ -636,6 +645,7 @@ def predict_single_live_chunk(path, debug_wav_path=None):
             continue
 
         processed = shared_preprocess_chunk(chunk)
+        preprocessed_chunks.append(processed)
         pred = model.predict(processed, verbose=0)[0]
         gun, scream, bg = pred
         label, alert = _prediction_from_probs(gun, scream, bg, mode="live")
@@ -650,6 +660,14 @@ def predict_single_live_chunk(path, debug_wav_path=None):
                 "alert": alert,
                 "score": score
             }
+    
+    # Save audio given to model (preprocessed chunks)
+    if debug_audio_to_model_path and preprocessed_chunks:
+        try:
+            os.makedirs(os.path.dirname(debug_audio_to_model_path), exist_ok=True)
+            np.save(debug_audio_to_model_path, np.array(preprocessed_chunks))
+        except Exception as e:
+            print(f"[DEBUG] Failed to save audio_to_model: {str(e)}")
 
     if best["score"] < 0:
         return {
@@ -801,6 +819,8 @@ async def predict_live_chunk(file: UploadFile = File(...)):
     debug_id = uuid.uuid4().hex
     debug_raw_path = os.path.join(TEST_RAW_DIR, f"{debug_id}{original_ext}")
     debug_wav_path = os.path.join(TEST_WAV_DIR, f"{debug_id}.wav")
+    debug_audio_received_path = os.path.join(TEST_AUDIO_RECEIVED_DIR, f"{debug_id}_received.wav")
+    debug_audio_to_model_path = os.path.join(TEST_AUDIO_TO_MODEL_DIR, f"{debug_id}_to_model.npy")
 
     with open(path, "wb") as f:
         f.write(await file.read())
@@ -809,6 +829,8 @@ async def predict_live_chunk(file: UploadFile = File(...)):
         try:
             os.makedirs(TEST_RAW_DIR, exist_ok=True)
             os.makedirs(TEST_WAV_DIR, exist_ok=True)
+            os.makedirs(TEST_AUDIO_RECEIVED_DIR, exist_ok=True)
+            os.makedirs(TEST_AUDIO_TO_MODEL_DIR, exist_ok=True)
             shutil.copy2(path, debug_raw_path)
         except OSError:
             pass
@@ -817,7 +839,9 @@ async def predict_live_chunk(file: UploadFile = File(...)):
         try:
             result = predict_single_live_chunk(
                 path,
-                debug_wav_path=debug_wav_path if SAVE_LIVE_CHUNKS_FOR_TESTING else None
+                debug_wav_path=debug_wav_path if SAVE_LIVE_CHUNKS_FOR_TESTING else None,
+                debug_audio_received_path=debug_audio_received_path if SAVE_LIVE_CHUNKS_FOR_TESTING else None,
+                debug_audio_to_model_path=debug_audio_to_model_path if SAVE_LIVE_CHUNKS_FOR_TESTING else None
             )
         except RuntimeError as exc:
             result = {

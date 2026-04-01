@@ -132,7 +132,7 @@ async function startRec() {
         hasScreamAlerted = false;
 
         updateLiveIndicator(true);
-        updateStatusMsg("Live recording started (3s chunks)...");
+        updateStatusMsg("Live recording started");
 
         recorder.ondataavailable = async (e) => {
             if (!e.data || e.data.size === 0) {
@@ -156,7 +156,6 @@ async function startRec() {
                 });
 
                 const data = await res.json();
-                updateLiveResult(liveChunkCount, data);
 
                 if (data.gunshot_alert && !hasGunshotAlerted) {
                     hasGunshotAlerted = true;
@@ -225,15 +224,14 @@ function updateLiveIndicator(isActive) {
 }
 
 function updateStatusMsg(message) {
+    if (typeof message === "string" && message.toLowerCase().includes("chunk")) {
+        return;
+    }
     document.getElementById("status-msg").textContent = `Status: ${message}`;
 }
 
 function updateLiveResult(chunkIndex, data) {
-    updateStatusMsg(`Chunk ${chunkIndex}: ${data.label}`);
-    if (data.confidence) {
-        const bar = document.getElementById("level-bar");
-        bar.style.width = (data.confidence * 100) + "%";
-    }
+    // Intentionally no chunk/status UI updates in live mode.
 }
 
 // Live indicator button handler
