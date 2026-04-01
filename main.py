@@ -98,6 +98,7 @@ LIVE_GAIN_DB = 4
 LIVE_SHAPING_FILTER = "highpass=f=120,lowpass=f=7000,acompressor=threshold=-22dB:ratio=3:attack=5:release=80,loudnorm"
 UPLOAD_RMS_MIN = 0.003
 LIVE_RMS_MIN = 0.01
+LIVE_SPIKE_BOOST = 1.08
 UPLOAD_DIR = "uploaded_audio"
 SAVE_LIVE_CHUNKS_FOR_TESTING = True
 TEST_CHUNKS_DIR = os.path.join("testing_chunks", "live_chunks")
@@ -497,7 +498,8 @@ def _load_audio_for_prediction(
     min_seconds=0.0,
     debug_wav_path=None,
     gain_db=0,
-    use_live_shaping=False
+    use_live_shaping=False,
+    spike_boost=1.0
 ):
     wav = os.path.splitext(path)[0] + "_converted.wav"
     try:
@@ -514,6 +516,10 @@ def _load_audio_for_prediction(
         audio, _ = librosa.load(wav, sr=SAMPLE_RATE, mono=True)
         audio = np.asarray(audio, dtype=np.float32)
         audio = np.nan_to_num(audio, nan=0.0, posinf=0.0, neginf=0.0)
+
+        # Slightly boost transients before feature extraction for quicker event pickup.
+        if spike_boost > 1.0:
+            audio = np.clip(audio * float(spike_boost), -1.0, 1.0)
 
         if audio.size == 0:
             raise RuntimeError("empty_audio_after_decode")
@@ -619,7 +625,8 @@ def predict_single_live_chunk(path, debug_wav_path=None, debug_audio_received_pa
     audio = _load_audio_for_prediction(
         path,
         min_seconds=LIVE_MIN_SECONDS,
-        debug_wav_path=debug_wav_path
+        debug_wav_path=debug_wav_path,
+        spike_boost=LIVE_SPIKE_BOOST
     )
     
     # Save audio received (after WAV conversion, before preprocessing)

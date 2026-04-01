@@ -36,25 +36,22 @@
     <div class="dashboard-container">
         <h1>Real-Time Distress Sound Detection</h1>
         <button id="live-indicator" class="offline">Offline</button>
+        <div id="runtime-timer" aria-live="polite">
+            <span class="runtime-label">Running Time</span>
+            <span id="live-runtime">00:00</span>
+        </div>
         <div id="mic-visualizer-wrap">
             <div class="visualizer-label">Microphone Waveform</div>
             <canvas id="mic-waveform" width="400" height="110"></canvas>
         </div>
         <div id="detection-status-panel">
-            <h2>Detection Status</h2>
-            <div class="status-row">
-                <span>Overall</span>
-                <span id="overall-chip" class="status-chip neutral">Monitoring</span>
-            </div>
-            <div class="status-row">
-                <span>Gunshot</span>
-                <span id="gunshot-chip" class="status-chip clear">Clear</span>
-            </div>
-            <div class="status-row">
-                <span>Scream</span>
-                <span id="scream-chip" class="status-chip clear">Clear</span>
+            <h2>Detection</h2>
+            <div class="status-row detection-live-row">
+                <span class="detection-live-label">Detection .......</span>
+                <span id="detection-chip" class="status-chip loading">Loading...</span>
             </div>
         </div>
+        <div id="live-alert" class="live-alert" aria-live="polite"></div>
         <div id="detection-log-panel">
             <div class="log-header">
                 <h2>Detection Event Log</h2>

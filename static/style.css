@@ -94,6 +94,33 @@ h1 {
     background: #f44336 !important;
 }
 
+#runtime-timer {
+    width: 100%;
+    max-width: 400px;
+    margin: -16px auto 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    color: #2f444c;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.runtime-label {
+    color: #5a7078;
+    font-weight: 600;
+}
+
+#live-runtime {
+    min-width: 56px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #e9f1f4;
+    color: #385764;
+    letter-spacing: 0.4px;
+}
+
 #mic-visualizer-wrap {
     margin: 0 auto 16px;
     width: 100%;
@@ -174,6 +201,75 @@ h1 {
 .status-chip.neutral {
     background: #e9f1f4;
     color: #385764;
+}
+
+.detection-live-row {
+    margin-bottom: 0;
+}
+
+.detection-live-label {
+    font-weight: 600;
+}
+
+.status-chip.loading {
+    background: #eef3f5;
+    color: #4b626b;
+}
+
+.status-chip.background {
+    background: #e7f7eb;
+    color: #237c3a;
+}
+
+.status-chip.gunshot {
+    background: #fde8e7;
+    color: #a22d28;
+}
+
+.status-chip.scream {
+    background: #fff3df;
+    color: #9a5b08;
+}
+
+.live-alert {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto 12px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: left;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    pointer-events: none;
+}
+
+.live-alert.show {
+    opacity: 1;
+    transform: translateY(0);
+    min-height: 20px;
+    padding: 10px 12px;
+}
+
+.live-alert.gunshot {
+    background: #fde8e7;
+    color: #a22d28;
+    border: 1px solid #f4c3c1;
+}
+
+.live-alert.scream {
+    background: #fff3df;
+    color: #9a5b08;
+    border: 1px solid #f8d8aa;
+}
+
+.live-alert.info {
+    background: #e9f1f4;
+    color: #385764;
+    border: 1px solid #c9dae1;
 }
 
 #meter-container {

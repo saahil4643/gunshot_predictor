@@ -14,6 +14,46 @@ let waveformCtxRef = null;
 let sourceNodeRef = null;
 const MAX_DETECTION_LOGS = 50;
 let logRefreshTimer = null;
+let liveAlertTimer = null;
+let liveTimerInterval = null;
+let liveElapsedSeconds = 0;
+
+function formatElapsed(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+function renderLiveTimer() {
+    const timer = document.getElementById("live-runtime");
+    if (!timer) {
+        return;
+    }
+    timer.textContent = formatElapsed(liveElapsedSeconds);
+}
+
+function startLiveTimer() {
+    if (liveTimerInterval) {
+        clearInterval(liveTimerInterval);
+    }
+
+    liveElapsedSeconds = 0;
+    renderLiveTimer();
+
+    liveTimerInterval = setInterval(() => {
+        liveElapsedSeconds += 1;
+        renderLiveTimer();
+    }, 1000);
+}
+
+function stopLiveTimer() {
+    if (liveTimerInterval) {
+        clearInterval(liveTimerInterval);
+        liveTimerInterval = null;
+    }
+    liveElapsedSeconds = 0;
+    renderLiveTimer();
+}
 
 function getDetectionTimestamp() {
     return new Date().toLocaleString([], {
@@ -112,36 +152,50 @@ async function refreshDetectionLogs() {
     }
 }
 
-function updateChipState(chipId, text, stateClass) {
-    const chip = document.getElementById(chipId);
+function showLiveAlert(message, type = "info") {
+    const alertEl = document.getElementById("live-alert");
+    if (!alertEl) {
+        return;
+    }
+
+    alertEl.classList.remove("gunshot", "scream", "info", "show");
+    alertEl.textContent = message;
+    alertEl.classList.add(type, "show");
+
+    if (liveAlertTimer) {
+        clearTimeout(liveAlertTimer);
+    }
+
+    liveAlertTimer = setTimeout(() => {
+        alertEl.classList.remove("show");
+    }, 3500);
+}
+
+function updateDetectionPanel(label, isLoading) {
+    const chip = document.getElementById("detection-chip");
     if (!chip) {
         return;
     }
 
-    chip.textContent = text;
-    chip.classList.remove("clear", "alert", "neutral");
-    chip.classList.add(stateClass);
-}
+    chip.classList.remove("clear", "alert", "neutral", "loading", "background", "gunshot", "scream");
 
-function updateDetectionPanel(gunshotDetected, screamDetected) {
-    if (gunshotDetected) {
-        updateChipState("gunshot-chip", "Detected", "alert");
-    } else {
-        updateChipState("gunshot-chip", "Clear", "clear");
+    if (isLoading) {
+        chip.textContent = "Loading...";
+        chip.classList.add("loading");
+        return;
     }
 
-    if (screamDetected) {
-        updateChipState("scream-chip", "Detected", "alert");
-    } else {
-        updateChipState("scream-chip", "Clear", "clear");
-    }
+    const normalized = String(label || "Background").trim().toLowerCase();
 
-    if (gunshotDetected || screamDetected) {
-        updateChipState("overall-chip", "Alert", "alert");
-    } else if (isLiveRunning) {
-        updateChipState("overall-chip", "Monitoring", "neutral");
+    if (normalized.includes("gunshot")) {
+        chip.textContent = "Gunshot";
+        chip.classList.add("gunshot");
+    } else if (normalized.includes("scream")) {
+        chip.textContent = "Scream";
+        chip.classList.add("scream");
     } else {
-        updateChipState("overall-chip", "Idle", "neutral");
+        chip.textContent = "Background";
+        chip.classList.add("background");
     }
 }
 
@@ -382,7 +436,7 @@ async function startRec() {
         liveChunkCount = 0;
         hasGunshotAlerted = false;
         hasScreamAlerted = false;
-        updateDetectionPanel(false, false);
+        updateDetectionPanel("Background", false);
 
         await startWaveform(streamRef);
 
@@ -401,6 +455,8 @@ async function startRec() {
             liveChunkCount += 1;
 
             try {
+                updateDetectionPanel("", true);
+
                 const wavBlob = await convertBlobToWav(e.data);
                 const formData = new FormData();
                 formData.append("file", wavBlob, `live_${liveChunkCount}.wav`);
@@ -414,18 +470,19 @@ async function startRec() {
 
                 if (data.gunshot_alert && !hasGunshotAlerted) {
                     hasGunshotAlerted = true;
-                    alert("Gunshot detected in live audio!");
+                    showLiveAlert("Gunshot detected in live audio", "gunshot");
                 }
 
                 if (data.scream_alert && !hasScreamAlerted) {
                     hasScreamAlerted = true;
-                    alert("Scream detected in live audio!");
+                    showLiveAlert("Scream detected in live audio", "scream");
                 }
 
-                updateDetectionPanel(hasGunshotAlerted, hasScreamAlerted);
+                updateDetectionPanel(data.label, false);
                 await refreshDetectionLogs();
             } catch (err) {
                 updateStatusMsg("Live detection error");
+                updateDetectionPanel("Background", false);
                 console.error(err);
             } finally {
                 if (isLiveRunning && recorder && recorder.state === "inactive") {
@@ -437,9 +494,10 @@ async function startRec() {
 
         recorder.start();
         scheduleChunkStop();
+        startLiveTimer();
     } catch (err) {
         updateStatusMsg("Failed to access microphone");
-        updateDetectionPanel(false, false);
+        updateDetectionPanel("Background", false);
         console.error(err);
     }
 }
@@ -466,10 +524,11 @@ function stopRec() {
     }
 
     stopWaveform().catch(err => console.error("Waveform stop failed:", err));
+    stopLiveTimer();
 
     updateLiveIndicator(false);
     updateStatusMsg("Live recording stopped");
-    updateDetectionPanel(hasGunshotAlerted, hasScreamAlerted);
+    updateDetectionPanel("Background", false);
 }
 
 // UI Update functions
@@ -503,7 +562,8 @@ function updateLiveResult(chunkIndex, data) {
 // Live indicator button handler
 document.addEventListener("DOMContentLoaded", function () {
     resetWaveformCanvas();
-    updateDetectionPanel(false, false);
+    updateDetectionPanel("Background", false);
+    renderLiveTimer();
     refreshDetectionLogs();
 
     if (!logRefreshTimer) {
@@ -651,6 +711,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             try {
                 updateStatusMsg("Uploading and analyzing...");
+                updateDetectionPanel("", true);
                 resultDiv.textContent = "Processing...";
                 resultDiv.classList.remove("error");
 
@@ -674,15 +735,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     resultDiv.classList.remove("error");
                     updateStatusMsg("Analysis complete");
 
-                    const gunshotDetected = Boolean(data.gunshot_alert);
-                    const screamDetected = Boolean(data.scream_alert);
-                    updateDetectionPanel(gunshotDetected, screamDetected);
+                    updateDetectionPanel(data.label, false);
 
                     if (data.gunshot_alert) {
-                        alert("Gunshot detected!");
+                        showLiveAlert("Gunshot detected from uploaded audio", "gunshot");
                     }
                     if (data.scream_alert) {
-                        alert("Scream detected!");
+                        showLiveAlert("Scream detected from uploaded audio", "scream");
                     }
 
                     await refreshDetectionLogs();
@@ -690,13 +749,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     resultDiv.textContent = `Error: ${data.error || data.label || "Unknown error"}`;
                     resultDiv.classList.add("error");
                     updateStatusMsg("Analysis failed");
-                    updateDetectionPanel(false, false);
+                    updateDetectionPanel("Background", false);
                 }
             } catch (error) {
                 resultDiv.textContent = "Error during upload: " + error.message;
                 resultDiv.classList.add("error");
                 updateStatusMsg("Upload error");
-                updateDetectionPanel(false, false);
+                updateDetectionPanel("Background", false);
                 console.error("Upload error:", error);
             }
         });
