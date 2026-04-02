@@ -499,7 +499,7 @@ def _load_audio_for_prediction(
     debug_wav_path=None,
     gain_db=0,
     use_live_shaping=False,
-    spike_boost=1.0
+    spike_boost=10.0
 ):
     wav = os.path.splitext(path)[0] + "_converted.wav"
     try:
