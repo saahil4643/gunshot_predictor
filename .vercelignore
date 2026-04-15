@@ -1,0 +1,30 @@
+# Large local/training artifacts that should never be uploaded to Vercel
+training_data/
+input_audio/
+uploaded_audio/
+uploaded_audio_dir/
+testing_chunks/
+
+# Python/build cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# VCS/editor
+.git/
+.gitignore
+.vscode/
+
+# Local docs/scripts not needed in runtime
+DEPLOYMENT-CHECKLIST.md
+DEPLOYMENT.md
+MAC-INSTALL-GUIDE.md
+SYSTEM-DOCUMENTATION.md
+SYSTEM-DOCUMENTATION.txt
+deploy.sh
+deploy.bat
+Dockerfile
+docker-compose.yml

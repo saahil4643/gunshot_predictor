@@ -1950,11 +1950,15 @@ from fastapi.staticfiles import StaticFiles
 
 from utils import split_audio, preprocess_chunk as shared_preprocess_chunk
 
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IS_VERCEL = os.environ.get("VERCEL") == "1"
+RUNTIME_DATA_DIR = tempfile.gettempdir() if IS_VERCEL else BASE_DIR
 
-MODEL_PATH = "model/final_audio_model_v4.h5"
+app = FastAPI()
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+
+MODEL_PATH = os.path.join(BASE_DIR, "model", "final_audio_model_v4.h5")
 
 
 class CompatibleInputLayer(tf.keras.layers.InputLayer):
@@ -2038,9 +2042,9 @@ LIVE_SHAPING_FILTER = "highpass=f=120,lowpass=f=7000,acompressor=threshold=-22dB
 
 LIVE_RMS_MIN = 0.01
 LIVE_SPIKE_BOOST = 1.08
-UPLOAD_DIR = "uploaded_audio"
-SAVE_LIVE_CHUNKS_FOR_TESTING = True
-TEST_CHUNKS_DIR = os.path.join("testing_chunks", "live_chunks")
+UPLOAD_DIR = os.path.join(RUNTIME_DATA_DIR, "uploaded_audio")
+SAVE_LIVE_CHUNKS_FOR_TESTING = False
+TEST_CHUNKS_DIR = os.path.join(RUNTIME_DATA_DIR, "testing_chunks", "live_chunks")
 TEST_RAW_DIR = os.path.join(TEST_CHUNKS_DIR, "raw")
 TEST_WAV_DIR = os.path.join(TEST_CHUNKS_DIR, "wav")
 TEST_AUDIO_RECEIVED_DIR = os.path.join(TEST_CHUNKS_DIR, "audio_received")
@@ -2056,11 +2060,11 @@ SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "sahilbhandare80@gmail.com")
 SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "hxzbgdbbfopqhrme")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "sahilbhandare79@gmail.com")
 
-EMAIL_CONFIG_DIR = "config"
+EMAIL_CONFIG_DIR = os.path.join(RUNTIME_DATA_DIR, "config")
 EMAIL_CONFIG_FILE = os.path.join(EMAIL_CONFIG_DIR, "receiver_email.txt")
 
 if os.path.exists(UPLOAD_DIR) and not os.path.isdir(UPLOAD_DIR):
-    UPLOAD_DIR = "uploaded_audio_dir"
+    UPLOAD_DIR = os.path.join(RUNTIME_DATA_DIR, "uploaded_audio_dir")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(EMAIL_CONFIG_DIR, exist_ok=True)
